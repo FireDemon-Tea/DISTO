@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Demo - Minecraft Server</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🎮</div>
+                <div class="logo-text">Minecraft Server Dashboard - Demo</div>
+            </div>
+            <div class="status-indicator" style="background: var(--success-color);">
+                <div class="status-dot"></div>
+                <span>Demo Mode</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Demo Notice -->
+        <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--primary-hover)); color: white; margin-bottom: 2rem;">
+            <div style="text-align: center;">
+                <h2 style="margin-bottom: 0.5rem;">🎯 Dashboard Demo</h2>
+                <p style="opacity: 0.9; margin-bottom: 1rem;">This is a demonstration of the professional dashboard with simulated data</p>
+                <a href="index.html" class="btn" style="background: white; color: var(--primary-color); border: none;">
+                    View Live Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="start-demo" class="btn btn-primary">Start Demo</button>
+            <button id="stop-demo" class="btn">Stop Demo</button>
+            <div class="refresh-indicator">
+                <span>Demo Status: <span id="demo-status">Stopped</span></span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="performance">Performance</button>
+            <button class="tab" data-tab="system">System</button>
+            <button class="tab" data-tab="players">Players</button>
+            <button class="tab" data-tab="network">Network</button>
+        </div>
+
+        <!-- Performance Tab -->
+        <div id="performance" class="tab-content active">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">TPS</div>
+                    <div id="tps" class="metric-value">20.0</div>
+                    <div class="metric-unit">ticks/sec</div>
+                    <div id="tps-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Tick Time</div>
+                    <div id="tick" class="metric-value">50.0</div>
+                    <div class="metric-unit">milliseconds</div>
+                    <div id="tick-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">CPU Usage</div>
+                    <div id="cpu" class="metric-value">45.2</div>
+                    <div class="metric-unit">percent</div>
+                    <div id="cpu-trend" class="metric-trend">→</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Tab -->
+        <div id="system" class="tab-content">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">RAM Usage</div>
+                    <div class="metric-dual">
+                        <div id="ram-mb" class="metric-primary">2048</div>
+                        <div id="ram-percent" class="metric-secondary">68%</div>
+                    </div>
+                    <div class="metric-unit">MB / %</div>
+                    <div id="ram-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Server Uptime</div>
+                    <div id="uptime" class="metric-value">2d 14h 32m</div>
+                    <div class="metric-unit">time</div>
+                    <div id="uptime-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Chunks Loaded</div>
+                    <div id="chunks" class="metric-value">1,247</div>
+                    <div class="metric-unit">chunks</div>
+                    <div id="chunks-trend" class="metric-trend">→</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Players Tab -->
+        <div id="players" class="tab-content">
+            <div class="grid grid-2">
+                <div class="card metric-card">
+                    <div class="metric-label">Players Online</div>
+                    <div id="pc" class="metric-value">12</div>
+                    <div class="metric-unit">players</div>
+                    <div id="pc-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Player Activity</div>
+                            <div class="card-subtitle">Currently online players</div>
+                        </div>
+                    </div>
+                    <div id="player-list" class="player-list">
+                        <div class="player-item">
+                            <div class="player-avatar">S</div>
+                            <div class="player-info">
+                                <div class="player-name">Steve</div>
+                                <div class="player-ping">Ping: 25ms</div>
+                            </div>
+                        </div>
+                        <div class="player-item">
+                            <div class="player-avatar">A</div>
+                            <div class="player-info">
+                                <div class="player-name">Alex</div>
+                                <div class="player-ping">Ping: 32ms</div>
+                            </div>
+                        </div>
+                        <div class="player-item">
+                            <div class="player-avatar">H</div>
+                            <div class="player-info">
+                                <div class="player-name">Herobrine</div>
+                                <div class="player-ping">Ping: 18ms</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tab -->
+        <div id="network" class="tab-content">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">Network Latency</div>
+                    <div id="lat" class="metric-value">25</div>
+                    <div class="metric-unit">milliseconds</div>
+                    <div id="lat-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">World Time</div>
+                    <div id="world-time" class="metric-value">15d 8h 45m</div>
+                    <div class="metric-unit">game time</div>
+                    <div id="world-time-trend" class="metric-trend">→</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Server Version</div>
+                    <div id="version" class="metric-value">1.20.4</div>
+                    <div class="metric-unit">minecraft</div>
+                    <div id="version-trend" class="metric-trend">→</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">TPS Performance</div>
+                        <div class="card-subtitle">Server tick rate over time</div>
+                    </div>
+                </div>
+                <div id="tps-chart" class="chart-container"></div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Tick Time</div>
+                        <div class="card-subtitle">Average tick duration</div>
+                    </div>
+                </div>
+                <div id="tick-chart" class="chart-container"></div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">CPU Usage</div>
+                        <div class="card-subtitle">Process CPU utilization</div>
+                    </div>
+                </div>
+                <div id="cpu-chart" class="chart-container"></div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Memory Usage</div>
+                        <div class="card-subtitle">RAM consumption</div>
+                    </div>
+                </div>
+                <div id="ram-chart" class="chart-container"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Demo functionality
+        class DashboardDemo {
+            constructor() {
+                this.isRunning = false;
+                this.interval = null;
+                this.history = [];
+                this.maxHistory = 50;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.setupTabs();
+                this.initializeCharts();
+            }
+
+            setupEventListeners() {
+                document.getElementById('start-demo').addEventListener('click', () => this.start());
+                document.getElementById('stop-demo').addEventListener('click', () => this.stop());
+            }
+
+            setupTabs() {
+                const tabs = document.querySelectorAll('.tab');
+                const tabContents = document.querySelectorAll('.tab-content');
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const targetTab = tab.getAttribute('data-tab');
+                        
+                        // Remove active class from all tabs and contents
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tabContents.forEach(content => content.classList.remove('active'));
+                        
+                        // Add active class to clicked tab and corresponding content
+                        tab.classList.add('active');
+                        const targetContent = document.getElementById(targetTab);
+                        if (targetContent) {
+                            targetContent.classList.add('active');
+                        }
+                    });
+                });
+            }
+
+            initializeCharts() {
+                this.charts = {
+                    tps: this.createChart('tps-chart', 'tps'),
+                    tick: this.createChart('tick-chart', 'tick_time_ms'),
+                    cpu: this.createChart('cpu-chart', 'cpu_usage_percent'),
+                    ram: this.createChart('ram-chart', 'ram_usage_mb')
+                };
+            }
+
+            createChart(containerId, dataKey) {
+                const container = document.getElementById(containerId);
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '150');
+                svg.setAttribute('viewBox', '0 0 400 150');
+                svg.style.background = 'var(--background)';
+                svg.style.borderRadius = 'var(--radius)';
+
+                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+                gradient.setAttribute('id', `gradient-${dataKey}`);
+                gradient.setAttribute('x1', '0%');
+                gradient.setAttribute('y1', '0%');
+                gradient.setAttribute('x2', '0%');
+                gradient.setAttribute('y2', '100%');
+
+                const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop1.setAttribute('offset', '0%');
+                stop1.setAttribute('style', 'stop-color:var(--primary-color);stop-opacity:0.3');
+                const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop2.setAttribute('offset', '100%');
+                stop2.setAttribute('style', 'stop-color:var(--primary-color);stop-opacity:0');
+
+                gradient.appendChild(stop1);
+                gradient.appendChild(stop2);
+                defs.appendChild(gradient);
+                svg.appendChild(defs);
+
+                const linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                linePath.setAttribute('id', `line-${dataKey}`);
+                linePath.setAttribute('stroke', 'var(--primary-color)');
+                linePath.setAttribute('stroke-width', '2');
+                linePath.setAttribute('fill', 'none');
+
+                const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                areaPath.setAttribute('id', `area-${dataKey}`);
+                areaPath.setAttribute('fill', `url(#gradient-${dataKey})`);
+
+                const currentText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                currentText.setAttribute('id', `current-${dataKey}`);
+                currentText.setAttribute('x', '10');
+                currentText.setAttribute('y', '20');
+                currentText.setAttribute('font-size', '12');
+                currentText.setAttribute('fill', 'var(--text-primary)');
+                currentText.textContent = 'Current: —';
+
+                const avgText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                avgText.setAttribute('id', `avg-${dataKey}`);
+                avgText.setAttribute('x', '10');
+                avgText.setAttribute('y', '35');
+                avgText.setAttribute('font-size', '10');
+                avgText.setAttribute('fill', 'var(--text-secondary)');
+                avgText.textContent = 'Average: —';
+
+                svg.appendChild(linePath);
+                svg.appendChild(areaPath);
+                svg.appendChild(currentText);
+                svg.appendChild(avgText);
+
+                container.innerHTML = '';
+                container.appendChild(svg);
+
+                return { linePath, areaPath, currentText, avgText };
+            }
+
+            start() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                document.getElementById('demo-status').textContent = 'Running';
+                document.getElementById('start-demo').disabled = true;
+                document.getElementById('stop-demo').disabled = false;
+
+                this.interval = setInterval(() => {
+                    this.updateDemoData();
+                }, 1000);
+            }
+
+            stop() {
+                if (!this.isRunning) return;
+                
+                this.isRunning = false;
+                document.getElementById('demo-status').textContent = 'Stopped';
+                document.getElementById('start-demo').disabled = false;
+                document.getElementById('stop-demo').disabled = true;
+
+                if (this.interval) {
+                    clearInterval(this.interval);
+                    this.interval = null;
+                }
+            }
+
+            updateDemoData() {
+                // Generate realistic demo data
+                const data = {
+                    tps: 19.5 + Math.random() * 0.8,
+                    tick_time_ms: 45 + Math.random() * 20,
+                    cpu_usage_percent: 40 + Math.random() * 20,
+                    ram_usage_mb: 2000 + Math.random() * 500,
+                    ram_usage_percent: 60 + Math.random() * 20,
+                    player_count: Math.floor(10 + Math.random() * 8),
+                    network_latency_ms: 20 + Math.random() * 15,
+                    server_uptime_ms: Date.now() - (Math.random() * 86400000 * 3), // Random uptime up to 3 days
+                    chunks_loaded: 1000 + Math.floor(Math.random() * 500),
+                    world_time: Math.random() * 24000,
+                    minecraft_version: '1.20.4'
+                };
+
+                // Update metric cards
+                document.getElementById('tps').textContent = data.tps.toFixed(1);
+                document.getElementById('tick').textContent = data.tick_time_ms.toFixed(1);
+                document.getElementById('cpu').textContent = data.cpu_usage_percent.toFixed(1);
+                
+                // Update RAM display
+                document.getElementById('ram-mb').textContent = Math.floor(data.ram_usage_mb);
+                document.getElementById('ram-percent').textContent = `${Math.floor(data.ram_usage_percent)}%`;
+                
+                document.getElementById('pc').textContent = data.player_count;
+                document.getElementById('lat').textContent = Math.floor(data.network_latency_ms);
+                document.getElementById('uptime').textContent = this.formatDuration(data.server_uptime_ms);
+                document.getElementById('chunks').textContent = data.chunks_loaded.toLocaleString();
+                document.getElementById('world-time').textContent = this.formatGameTime(data.world_time);
+                document.getElementById('version').textContent = data.minecraft_version;
+
+                // Add to history
+                this.history.push({ timestamp: Date.now(), ...data });
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                }
+
+                // Update charts
+                this.updateCharts();
+            }
+
+            updateCharts() {
+                if (this.history.length < 2) return;
+
+                Object.keys(this.charts).forEach(key => {
+                    const dataKey = this.getDataKey(key);
+                    this.updateChart(key, dataKey);
+                });
+            }
+
+            getDataKey(chartKey) {
+                const mapping = {
+                    'tps': 'tps',
+                    'tick': 'tick_time_ms',
+                    'cpu': 'cpu_usage_percent',
+                    'ram': 'ram_usage_mb'
+                };
+                return mapping[chartKey] || chartKey;
+            }
+
+            updateChart(chartKey, dataKey) {
+                const chart = this.charts[chartKey];
+                if (!chart) return;
+
+                const data = this.history.map(h => h[dataKey]).filter(v => v !== undefined && !isNaN(v));
+                if (data.length < 2) return;
+
+                const maxData = Math.max(...data);
+                const minData = Math.min(...data);
+                const range = maxData - minData || 1;
+                const width = 400;
+                const height = 150;
+                const padding = 20;
+
+                // Create path data
+                let linePathData = '';
+                let areaPathData = '';
+
+                data.forEach((value, index) => {
+                    const x = padding + (index / (data.length - 1)) * (width - 2 * padding);
+                    const y = height - padding - ((value - minData) / range) * (height - 2 * padding);
+                    
+                    if (index === 0) {
+                        linePathData += `M ${x} ${y}`;
+                        areaPathData += `M ${x} ${height - padding} L ${x} ${y}`;
+                    } else {
+                        linePathData += ` L ${x} ${y}`;
+                        areaPathData += ` L ${x} ${y}`;
+                    }
+                });
+
+                // Close area path
+                const lastX = padding + (width - 2 * padding);
+                areaPathData += ` L ${lastX} ${height - padding} Z`;
+
+                chart.linePath.setAttribute('d', linePathData);
+                chart.areaPath.setAttribute('d', areaPathData);
+
+                // Update text
+                const current = data[data.length - 1];
+                const average = data.reduce((a, b) => a + b, 0) / data.length;
+                
+                chart.currentText.textContent = `Current: ${current.toFixed(1)}`;
+                chart.avgText.textContent = `Average: ${average.toFixed(1)}`;
+            }
+        }
+
+        formatDuration(ms) {
+            if (ms < 1000) return `${ms}ms`;
+            if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+            if (ms < 3600000) return `${(ms / 60000).toFixed(1)}m`;
+            if (ms < 86400000) return `${(ms / 3600000).toFixed(1)}h`;
+            return `${(ms / 86400000).toFixed(1)}d`;
+        }
+
+        formatGameTime(time) {
+            if (time === undefined || time === null) return '—';
+            
+            const days = Math.floor(time / 24000);
+            const hours = Math.floor((time % 24000) / 1000);
+            const minutes = Math.floor((time % 1000) * 0.06);
+            
+            if (days > 0) {
+                return `${days}d ${hours}h ${minutes}m`;
+            } else if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else {
+                return `${minutes}m`;
+            }
+        }
+    }
+
+    // Initialize demo when DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+        window.demo = new DashboardDemo();
+    });
+    </script>
+</body>
+</html>

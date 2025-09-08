@@ -29,6 +29,8 @@ public class JsonUtil {
         root.put("cpu_usage_percent", Double.isNaN(cpu) ? "Data unavailable" : round(cpu));
         MetricsSampler.MemoryStats mem = sampler.memory();
         root.put("ram_usage_mb", Math.round(mem.used() / (1024.0 * 1024.0)));
+        root.put("ram_total_mb", Math.round(mem.total() / (1024.0 * 1024.0)));
+        root.put("ram_usage_percent", Math.round((double) mem.used() / mem.total() * 100.0));
 
         // Players and latency
         if (server != null && server.getPlayerManager() != null) {
@@ -36,9 +38,52 @@ public class JsonUtil {
             root.put("player_count", players.size());
             double avg = players.stream().mapToInt(p -> p.networkHandler.getLatency()).average().orElse(Double.NaN);
             root.put("network_latency_ms", Double.isNaN(avg) ? "Data unavailable" : Math.round(avg));
+            
+            // Add player details
+            List<Map<String, Object>> playerDetails = players.stream()
+                .map(player -> {
+                    Map<String, Object> playerInfo = new HashMap<>();
+                    playerInfo.put("name", player.getName().getString());
+                    playerInfo.put("ping", player.networkHandler.getLatency());
+                    return playerInfo;
+                })
+                .toList();
+            root.put("players", playerDetails);
         } else {
             root.put("player_count", "Data unavailable");
             root.put("network_latency_ms", "Data unavailable");
+            root.put("players", List.of());
+        }
+
+        // Server information
+        if (server != null) {
+            // Server uptime (in milliseconds)
+            long uptimeMs = server.getTicks() * 50L; // 50ms per tick
+            root.put("server_uptime_ms", uptimeMs);
+            
+            // Minecraft version
+            root.put("minecraft_version", server.getVersion());
+            
+            // World time (if world is available)
+            if (server.getOverworld() != null) {
+                long worldTime = server.getOverworld().getTimeOfDay();
+                root.put("world_time", worldTime);
+            } else {
+                root.put("world_time", "Data unavailable");
+            }
+            
+            // Chunks loaded
+            if (server.getOverworld() != null) {
+                int chunksLoaded = server.getOverworld().getChunkManager().getTotalChunksLoadedCount();
+                root.put("chunks_loaded", chunksLoaded);
+            } else {
+                root.put("chunks_loaded", "Data unavailable");
+            }
+        } else {
+            root.put("server_uptime_ms", "Data unavailable");
+            root.put("minecraft_version", "Data unavailable");
+            root.put("world_time", "Data unavailable");
+            root.put("chunks_loaded", "Data unavailable");
         }
 
         return root;

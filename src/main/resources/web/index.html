@@ -1,53 +1,205 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Minecraft Metrics</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:2rem;}
-    .card{border:1px solid #ddd;border-radius:12px;padding:16px;margin:8px;display:inline-block;min-width:220px}
-    .grid{display:flex;flex-wrap:wrap;gap:12px}
-    .k{color:#666;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
-    .v{font-size:28px;font-weight:700}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Server Dashboard</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
 </head>
 <body>
-  <h1>Fabric Server — Live Metrics</h1>
-  <div class="grid">
-    <div class="card"><div class="k">TPS</div><div id="tps" class="v">—</div></div>
-    <div class="card"><div class="k">Tick (ms)</div><div id="tick" class="v">—</div></div>
-    <div class="card"><div class="k">CPU (%)</div><div id="cpu" class="v">—</div></div>
-    <div class="card"><div class="k">RAM (MB)</div><div id="ram" class="v">—</div></div>
-    <div class="card"><div class="k">Players</div><div id="pc" class="v">—</div></div>
-    <div class="card"><div class="k">Latency (ms)</div><div id="lat" class="v">—</div></div>
-  </div>
-  <script>
-    const token = localStorage.getItem('metrics_token') || prompt('Enter token');
-    localStorage.setItem('metrics_token', token);
-    function set(id, v){document.getElementById(id).textContent = v}
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🎮</div>
+                <div class="logo-text">Minecraft Server Dashboard</div>
+            </div>
+            <div class="status-indicator" id="connection-status">
+                <div class="status-dot"></div>
+                <span>Connecting...</span>
+            </div>
+        </div>
+    </header>
 
-    function fetchMetrics(){
-      fetch(`/api/metrics?token=${encodeURIComponent(token)}`)
-        .then(response => response.json())
-        .then(data => {
-          set('tps', data.tps); 
-          set('tick', data.tick_time_ms); 
-          set('cpu', data.cpu_usage_percent);
-          set('ram', data.ram_usage_mb); 
-          set('pc', data.player_count); 
-          set('lat', data.network_latency_ms);
-        })
-        .catch(error => {
-          console.error('Failed to fetch metrics:', error);
-          set('tps', 'Error'); set('tick', 'Error'); set('cpu', 'Error');
-          set('ram', 'Error'); set('pc', 'Error'); set('lat', 'Error');
-        });
-    }
-    
-    // Fetch metrics immediately and then every 2 seconds
-    fetchMetrics();
-    setInterval(fetchMetrics, 2000);
-  </script>
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Controls -->
+        <div class="controls">
+            <button id="refresh-btn" class="btn btn-primary">
+                <span id="refresh-spinner" class="refresh-spinner" style="display: none;"></span>
+                Refresh
+            </button>
+            <label class="btn">
+                <input type="checkbox" id="auto-refresh" checked>
+                Auto-refresh
+            </label>
+            <div class="refresh-indicator">
+                <span>Last update: <span id="last-refresh">Never</span></span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="performance">Performance</button>
+            <button class="tab" data-tab="system">System</button>
+            <button class="tab" data-tab="players">Players</button>
+            <button class="tab" data-tab="network">Network</button>
+        </div>
+
+        <!-- Performance Tab -->
+        <div id="performance" class="tab-content active">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">TPS</div>
+                    <div id="tps" class="metric-value">—</div>
+                    <div class="metric-unit">ticks/sec</div>
+                    <div id="tps-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Tick Time</div>
+                    <div id="tick" class="metric-value">—</div>
+                    <div class="metric-unit">milliseconds</div>
+                    <div id="tick-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">CPU Usage</div>
+                    <div id="cpu" class="metric-value">—</div>
+                    <div class="metric-unit">percent</div>
+                    <div id="cpu-trend" class="metric-trend">—</div>
+                </div>
+            </div>
+            
+            <!-- Performance Charts -->
+            <div class="grid grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">TPS Performance</div>
+                            <div class="card-subtitle">Server tick rate over time</div>
+                        </div>
+                    </div>
+                    <div id="tps-chart" class="chart-container"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Tick Time</div>
+                            <div class="card-subtitle">Average tick duration</div>
+                        </div>
+                    </div>
+                    <div id="tick-chart" class="chart-container"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">CPU Usage</div>
+                            <div class="card-subtitle">Process CPU utilization</div>
+                        </div>
+                    </div>
+                    <div id="cpu-chart" class="chart-container"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Memory Usage</div>
+                            <div class="card-subtitle">RAM consumption</div>
+                        </div>
+                    </div>
+                    <div id="ram-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Tab -->
+        <div id="system" class="tab-content">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">RAM Usage</div>
+                    <div class="metric-dual">
+                        <div id="ram-mb" class="metric-primary">—</div>
+                        <div id="ram-percent" class="metric-secondary">—</div>
+                    </div>
+                    <div class="metric-unit">MB / %</div>
+                    <div id="ram-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Server Uptime</div>
+                    <div id="uptime" class="metric-value">—</div>
+                    <div class="metric-unit">time</div>
+                    <div id="uptime-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Chunks Loaded</div>
+                    <div id="chunks" class="metric-value">—</div>
+                    <div class="metric-unit">chunks</div>
+                    <div id="chunks-trend" class="metric-trend">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Players Tab -->
+        <div id="players" class="tab-content">
+            <div class="grid grid-2">
+                <div class="card metric-card">
+                    <div class="metric-label">Players Online</div>
+                    <div id="pc" class="metric-value">—</div>
+                    <div class="metric-unit">players</div>
+                    <div id="pc-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Player Activity</div>
+                            <div class="card-subtitle">Currently online players</div>
+                        </div>
+                    </div>
+                    <div id="player-list" class="player-list">
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            No players online
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tab -->
+        <div id="network" class="tab-content">
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">Network Latency</div>
+                    <div id="lat" class="metric-value">—</div>
+                    <div class="metric-unit">milliseconds</div>
+                    <div id="lat-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">World Time</div>
+                    <div id="world-time" class="metric-value">—</div>
+                    <div class="metric-unit">game time</div>
+                    <div id="world-time-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Server Version</div>
+                    <div id="version" class="metric-value">—</div>
+                    <div class="metric-unit">minecraft</div>
+                    <div id="version-trend" class="metric-trend">—</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/dashboard.js"></script>
 </body>
 </html>
