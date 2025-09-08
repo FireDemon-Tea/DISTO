@@ -15,6 +15,7 @@ class MetricsDashboard {
         this.charts = {};
         this.ws = null;
         this.wsConnected = false;
+        this.lastModDataHash = null;
         
         this.init();
     }
@@ -121,10 +122,7 @@ class MetricsDashboard {
         }
 
 
-        // Add welcome message
-        this.addConsoleLine('Server Console Ready', 'info');
-        this.addConsoleLine('Type a command and press Enter to execute', 'info');
-        this.addConsoleLine('Connecting to live console stream...', 'info');
+        // Console is ready - no welcome messages needed
     }
 
     setupSettingsListeners() {
@@ -224,7 +222,7 @@ class MetricsDashboard {
 
         } catch (error) {
             console.error('Failed to fetch metrics:', error);
-            this.showError(`Connection failed: ${error.message}`);
+            // Don't show error messages to user - just update connection status silently
             this.isConnected = false;
             this.updateConnectionStatus();
         }
@@ -263,6 +261,11 @@ class MetricsDashboard {
         this.updateMetric('uptime', data.server_uptime_ms, 'duration', previous);
         this.updateMetric('chunks', data.chunks_loaded, 'integer', previous);
         
+        // Disk usage metrics
+        this.updateMetric('world-size', data.world_size_mb, 'integer', previous);
+        this.updateMetric('disk-free', data.disk_free_gb, 'integer', previous);
+        this.updateMetric('disk-usage', data.disk_usage_percent, 'integer', previous);
+        
         // Player metrics
         this.updateMetric('pc', data.player_count, 'integer', previous);
         
@@ -270,6 +273,15 @@ class MetricsDashboard {
         this.updateMetric('lat', data.network_latency_ms, 'number', previous);
         this.updateMetric('world-time', data.world_time, 'time', previous);
         this.updateMetric('version', data.minecraft_version, 'string', previous);
+        
+        // Entity metrics - no longer showing total count as separate metric
+        
+        // Mod metrics - no longer showing mod count as separate metric
+        
+        // Update detailed sections
+        this.updateNetworkStats(data);
+        this.updateEntityBreakdown(data);
+        this.updateModList(data);
     }
 
     updateMetric(id, value, format, previous) {
@@ -593,7 +605,13 @@ class MetricsDashboard {
         if (data.players && Array.isArray(data.players) && data.players.length > 0) {
             playerListElement.innerHTML = data.players.map(player => `
                 <div class="player-item">
-                    <div class="player-avatar">${player.name ? player.name.charAt(0).toUpperCase() : '?'}</div>
+                    <div class="player-head">
+                        <img src="https://mc-heads.net/avatar/${player.name || 'steve'}/32" 
+                             alt="${player.name || 'Unknown'}" 
+                             class="player-head-image"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="player-avatar-fallback" style="display:none;">${player.name ? player.name.charAt(0).toUpperCase() : '?'}</div>
+                    </div>
                     <div class="player-info">
                         <div class="player-name">${player.name || 'Unknown'}</div>
                         <div class="player-ping">Ping: ${player.ping || 0}ms</div>
@@ -621,9 +639,236 @@ class MetricsDashboard {
         }
     }
 
+    updateNetworkStats(data) {
+        const networkStatsElement = document.getElementById('network-stats');
+        if (!networkStatsElement) return;
+
+        if (data.network_stats && typeof data.network_stats === 'object') {
+            const stats = data.network_stats;
+            networkStatsElement.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Connected Players</div>
+                        <div class="stat-value">${stats.connected_players || 0}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Packets Sent</div>
+                        <div class="stat-value">${this.formatNumber(stats.packets_sent_total || 0)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Packets Received</div>
+                        <div class="stat-value">${this.formatNumber(stats.packets_received_total || 0)}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Activity Level</div>
+                        <div class="stat-value ${stats.network_activity_level === 'Active' ? 'status-good' : 'status-warning'}">${stats.network_activity_level || 'Unknown'}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            networkStatsElement.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📡</div>
+                    <div>Network statistics not available</div>
+                </div>
+            `;
+        }
+    }
+
+    updateEntityBreakdown(data) {
+        const entityBreakdownElement = document.getElementById('entity-breakdown');
+        if (!entityBreakdownElement) return;
+
+        if (data.entity_counts_summary && typeof data.entity_counts_summary === 'object') {
+            const summary = data.entity_counts_summary;
+            // Filter out players from entity list
+            const filteredEntities = Object.entries(summary)
+                .filter(([type]) => type !== 'minecraft:player')
+                .sort(([,a], [,b]) => b - a);
+
+            if (filteredEntities.length > 0) {
+                entityBreakdownElement.innerHTML = `
+                    <div class="entity-grid">
+                        ${filteredEntities.map(([type, count]) => `
+                            <div class="entity-tile">
+                                <div class="entity-image">${this.getEntityImage(type)}</div>
+                                <div class="entity-count-large">${count}</div>
+                                <div class="entity-type-small">${this.formatEntityType(type)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                entityBreakdownElement.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
+                        <div>No entities found</div>
+                    </div>
+                `;
+            }
+        } else {
+            entityBreakdownElement.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔍</div>
+                    <div>Entity information not available</div>
+                </div>
+            `;
+        }
+    }
+
+    updateModList(data) {
+        const modListElement = document.getElementById('mod-list');
+        if (!modListElement) return;
+
+        if (data.mod_status && data.mod_status.loaded_mods && Array.isArray(data.mod_status.loaded_mods)) {
+            const mods = data.mod_status.loaded_mods;
+            const fabricVersion = data.mod_status.fabric_version || 'Unknown';
+            
+            // Create a hash of the mod data to check if it changed
+            const modDataHash = this.createModDataHash(mods, fabricVersion);
+            
+            // Only update if mod data actually changed
+            if (this.lastModDataHash !== modDataHash) {
+                this.lastModDataHash = modDataHash;
+                
+                // Preserve current section states before updating
+                const currentStates = this.getModSectionStates();
+                
+                // Categorize mods
+                const categorizedMods = this.categorizeMods(mods);
+                
+                modListElement.innerHTML = `
+                    <div class="mod-info">
+                        <div class="mod-info-item">
+                            <div class="mod-info-label">Fabric Version</div>
+                            <div class="mod-info-value">${fabricVersion}</div>
+                        </div>
+                    </div>
+                    <div class="mod-sections">
+                        ${this.renderModSection('User Mods', categorizedMods.user, currentStates['user-mods'] !== false)}
+                        ${this.renderModSection('Fabric API', categorizedMods.fabric, currentStates['fabric-api'] === true)}
+                        ${this.renderModSection('Libraries', categorizedMods.libraries, currentStates['libraries'] === true)}
+                        ${this.renderModSection('Core Components', categorizedMods.core, currentStates['core-components'] === true)}
+                    </div>
+                `;
+            }
+        } else {
+            // Only show error if we haven't shown it before
+            if (!modListElement.querySelector('.error-message')) {
+                modListElement.innerHTML = `
+                    <div class="error-message" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔧</div>
+                        <div>Mod information not available</div>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    createModDataHash(mods, fabricVersion) {
+        // Create a simple hash of the mod data to detect changes
+        const modData = {
+            count: mods.length,
+            fabricVersion: fabricVersion,
+            modIds: mods.map(mod => `${mod.id}:${mod.version}`).sort()
+        };
+        return JSON.stringify(modData);
+    }
+
+    getModSectionStates() {
+        const states = {};
+        const sections = ['user-mods', 'fabric-api', 'libraries', 'core-components'];
+        
+        sections.forEach(sectionId => {
+            const content = document.getElementById(`${sectionId}-content`);
+            if (content) {
+                states[sectionId] = content.classList.contains('expanded');
+            }
+        });
+        
+        return states;
+    }
+
+    categorizeMods(mods) {
+        const categories = {
+            user: [],
+            fabric: [],
+            libraries: [],
+            core: []
+        };
+
+        mods.forEach(mod => {
+            const id = mod.id.toLowerCase();
+            const name = (mod.name || mod.id).toLowerCase();
+
+            // User mods (not Fabric API, not core libraries)
+            if (!id.startsWith('fabric') && 
+                !id.startsWith('minecraft') && 
+                !id.startsWith('java') &&
+                !id.startsWith('openjdk') &&
+                !id.startsWith('mixin') &&
+                !this.isLibrary(id, name)) {
+                categories.user.push(mod);
+            }
+            // Fabric API components
+            else if (id.startsWith('fabric') || name.includes('fabric api')) {
+                categories.fabric.push(mod);
+            }
+            // Libraries
+            else if (this.isLibrary(id, name)) {
+                categories.libraries.push(mod);
+            }
+            // Core components
+            else {
+                categories.core.push(mod);
+            }
+        });
+
+        return categories;
+    }
+
+    isLibrary(id, name) {
+        const libraryPatterns = [
+            'jackson', 'javalin', 'jakarta', 'jetty', 'kotlin', 'slf4j',
+            'gson', 'log4j', 'commons', 'apache', 'google', 'netty'
+        ];
+        
+        return libraryPatterns.some(pattern => 
+            id.includes(pattern) || name.includes(pattern)
+        );
+    }
+
+    renderModSection(title, mods, isExpanded = false) {
+        if (mods.length === 0) return '';
+
+        const sectionId = title.toLowerCase().replace(/\s+/g, '-');
+        const isUserMods = title === 'User Mods';
+        
+        return `
+            <div class="mod-section">
+                <div class="mod-section-header" onclick="toggleModSection('${sectionId}')">
+                    <div class="mod-section-title">
+                        <span class="mod-section-arrow ${isExpanded ? 'expanded' : ''}">▶</span>
+                        ${title}
+                        <span class="mod-section-count">(${mods.length})</span>
+                    </div>
+                </div>
+                <div class="mod-section-content ${isExpanded ? 'expanded' : ''}" id="${sectionId}-content">
+                    <div class="mod-grid">
+                        ${mods.map(mod => `
+                            <div class="mod-tile ${isUserMods ? 'user-mod' : ''}">
+                                <div class="mod-name-large">${mod.name || mod.id}</div>
+                                <div class="mod-version-small">${mod.version || 'Unknown'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     // HTTP polling for console output (WebSocket alternative)
     startConsolePolling() {
-        this.addConsoleLine('Starting console output polling...', 'info');
         this.consolePollingInterval = setInterval(() => {
             this.fetchConsoleOutput();
         }, 2000); // Poll every 2 seconds
@@ -647,7 +892,7 @@ class MetricsDashboard {
             
             if (!response.ok) {
                 if (response.status === 401) {
-                    this.addConsoleLine('Authentication failed - check your token', 'error');
+                    // Silently handle authentication failure
                     this.stopConsolePolling();
                     return;
                 }
@@ -664,7 +909,6 @@ class MetricsDashboard {
                 
                 // Handle case where console output was reset (server restart, etc.)
                 if (data.console_output.length < this.consoleOutputHistory.length) {
-                    this.addConsoleLine('[INFO] Console output was reset (server restart?)', 'info');
                     this.consoleOutputHistory = [];
                 }
                 
@@ -687,7 +931,7 @@ class MetricsDashboard {
 
         } catch (error) {
             console.error('Failed to fetch console output:', error);
-            this.addConsoleLine(`Console polling error: ${error.message}`, 'error');
+            // Don't show console polling errors to user
         }
     }
 
@@ -888,6 +1132,161 @@ class MetricsDashboard {
             return `${hours}h ${minutes}m`;
         } else {
             return `${minutes}m`;
+        }
+    }
+
+    formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+
+    formatEntityType(type) {
+        // Convert entity type IDs to more readable names
+        const typeMap = {
+            'minecraft:player': 'Player',
+            'minecraft:zombie': 'Zombie',
+            'minecraft:skeleton': 'Skeleton',
+            'minecraft:creeper': 'Creeper',
+            'minecraft:spider': 'Spider',
+            'minecraft:enderman': 'Enderman',
+            'minecraft:cow': 'Cow',
+            'minecraft:pig': 'Pig',
+            'minecraft:sheep': 'Sheep',
+            'minecraft:chicken': 'Chicken',
+            'minecraft:item': 'Dropped Item',
+            'minecraft:arrow': 'Arrow',
+            'minecraft:experience_orb': 'XP Orb',
+            'minecraft:item_frame': 'Item Frame',
+            'minecraft:painting': 'Painting'
+        };
+        
+        return typeMap[type] || type.replace('minecraft:', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    getEntityImage(type) {
+        // Map entity types to their local head image sources
+        const entityImages = {
+            'minecraft:player': '/heads/player.png',
+            'minecraft:zombie': '/heads/zombie.png',
+            'minecraft:skeleton': '/heads/skeleton.png',
+            'minecraft:creeper': '/heads/creeper.png',
+            'minecraft:spider': '/heads/spider.png',
+            'minecraft:enderman': '/heads/enderman.png',
+            'minecraft:cow': '/heads/cow.png',
+            'minecraft:pig': '/heads/pig.png',
+            'minecraft:sheep': '/heads/sheep.png',
+            'minecraft:chicken': '/heads/chicken.png',
+            'minecraft:bat': '/heads/bat.png',
+            'minecraft:cod': '/heads/cod.png',
+            'minecraft:salmon': '/heads/salmon.png',
+            'minecraft:tropical_fish': '/heads/tropical_fish.png',
+            'minecraft:pufferfish': '/heads/pufferfish.png',
+            'minecraft:dolphin': '/heads/dolphin.png',
+            'minecraft:squid': '/heads/squid.png',
+            'minecraft:glow_squid': '/heads/glow_squid.png',
+            'minecraft:horse': '/heads/horse.png',
+            'minecraft:donkey': '/heads/donkey.png',
+            'minecraft:mule': '/heads/mule.png',
+            'minecraft:llama': '/heads/llama.png',
+            'minecraft:wolf': '/heads/wolf.png',
+            'minecraft:cat': '/heads/cat.png',
+            'minecraft:ocelot': '/heads/ocelot.png',
+            'minecraft:fox': '/heads/fox.png',
+            'minecraft:rabbit': '/heads/rabbit.png',
+            'minecraft:polar_bear': '/heads/polar_bear.png',
+            'minecraft:panda': '/heads/panda.png',
+            'minecraft:bee': '/heads/bee.png',
+            'minecraft:item': '/heads/item.png',
+            'minecraft:arrow': '/heads/arrow.png',
+            'minecraft:experience_orb': '/heads/experience_orb.png',
+            'minecraft:item_frame': '/heads/item_frame.png',
+            'minecraft:painting': '/heads/painting.png',
+            'minecraft:minecart': '/heads/minecart.png',
+            'minecraft:chest_minecart': '/heads/chest_minecart.png',
+            'minecraft:furnace_minecart': '/heads/furnace_minecart.png',
+            'minecraft:tnt_minecart': '/heads/tnt_minecart.png',
+            'minecraft:hopper_minecart': '/heads/hopper_minecart.png',
+            'minecraft:boat': '/heads/boat.png',
+            'minecraft:chest_boat': '/heads/chest_boat.png'
+        };
+
+        const imageUrl = entityImages[type];
+        if (imageUrl) {
+            return `<img src="${imageUrl}" alt="${this.formatEntityType(type)}" class="entity-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><div class="entity-fallback" style="display:none;">${this.getEntityEmoji(type)}</div>`;
+        } else {
+            return `<div class="entity-fallback">${this.getEntityEmoji(type)}</div>`;
+        }
+    }
+
+    getEntityEmoji(type) {
+        // Fallback emojis for entities without specific images
+        const entityEmojis = {
+            'minecraft:player': '🧑',
+            'minecraft:zombie': '🧟',
+            'minecraft:skeleton': '💀',
+            'minecraft:creeper': '💥',
+            'minecraft:spider': '🕷️',
+            'minecraft:enderman': '👤',
+            'minecraft:cow': '🐄',
+            'minecraft:pig': '🐷',
+            'minecraft:sheep': '🐑',
+            'minecraft:chicken': '🐔',
+            'minecraft:bat': '🦇',
+            'minecraft:cod': '🐟',
+            'minecraft:salmon': '🐟',
+            'minecraft:tropical_fish': '🐠',
+            'minecraft:pufferfish': '🐡',
+            'minecraft:dolphin': '🐬',
+            'minecraft:squid': '🦑',
+            'minecraft:glow_squid': '🦑',
+            'minecraft:horse': '🐴',
+            'minecraft:donkey': '🫏',
+            'minecraft:mule': '🫏',
+            'minecraft:llama': '🦙',
+            'minecraft:wolf': '🐺',
+            'minecraft:cat': '🐱',
+            'minecraft:ocelot': '🐱',
+            'minecraft:fox': '🦊',
+            'minecraft:rabbit': '🐰',
+            'minecraft:polar_bear': '🐻‍❄️',
+            'minecraft:panda': '🐼',
+            'minecraft:bee': '🐝',
+            'minecraft:item': '📦',
+            'minecraft:arrow': '🏹',
+            'minecraft:experience_orb': '✨',
+            'minecraft:item_frame': '🖼️',
+            'minecraft:painting': '🎨',
+            'minecraft:minecart': '🚂',
+            'minecraft:chest_minecart': '🚂',
+            'minecraft:furnace_minecart': '🚂',
+            'minecraft:tnt_minecart': '🚂',
+            'minecraft:hopper_minecart': '🚂',
+            'minecraft:boat': '🚤',
+            'minecraft:chest_boat': '🚤'
+        };
+
+        return entityEmojis[type] || '❓';
+    }
+}
+
+// Global function for toggling mod sections
+function toggleModSection(sectionId) {
+    const content = document.getElementById(`${sectionId}-content`);
+    const arrow = document.querySelector(`#${sectionId}-content`).previousElementSibling.querySelector('.mod-section-arrow');
+    
+    if (content && arrow) {
+        const isExpanded = content.classList.contains('expanded');
+        
+        if (isExpanded) {
+            content.classList.remove('expanded');
+            arrow.classList.remove('expanded');
+        } else {
+            content.classList.add('expanded');
+            arrow.classList.add('expanded');
         }
     }
 }

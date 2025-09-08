@@ -37,6 +37,8 @@
             <button class="tab" data-tab="system">System</button>
             <button class="tab" data-tab="players">Players</button>
             <button class="tab" data-tab="network">Network</button>
+            <button class="tab" data-tab="entities">Entities</button>
+            <button class="tab" data-tab="mods">Mods</button>
             <button class="tab" data-tab="console">Console</button>
         </div>
 
@@ -136,6 +138,30 @@
                     <div id="chunks-trend" class="metric-trend">—</div>
                 </div>
             </div>
+            
+            <!-- Disk Usage Section -->
+            <div class="grid grid-3">
+                <div class="card metric-card">
+                    <div class="metric-label">World Size</div>
+                    <div id="world-size" class="metric-value">—</div>
+                    <div class="metric-unit">MB</div>
+                    <div id="world-size-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Disk Free</div>
+                    <div id="disk-free" class="metric-value">—</div>
+                    <div class="metric-unit">GB</div>
+                    <div id="disk-free-trend" class="metric-trend">—</div>
+                </div>
+                
+                <div class="card metric-card">
+                    <div class="metric-label">Disk Usage</div>
+                    <div id="disk-usage" class="metric-value">—</div>
+                    <div class="metric-unit">%</div>
+                    <div id="disk-usage-trend" class="metric-trend">—</div>
+                </div>
+            </div>
         </div>
 
         <!-- Players Tab -->
@@ -186,6 +212,57 @@
                     <div id="version" class="metric-value">—</div>
                     <div class="metric-unit">minecraft</div>
                     <div id="version-trend" class="metric-trend">—</div>
+                </div>
+            </div>
+            
+            <!-- Network Statistics Section -->
+            <div class="grid grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Network Statistics</div>
+                            <div class="card-subtitle">Connection and packet information</div>
+                        </div>
+                    </div>
+                    <div id="network-stats" class="network-stats">
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            Loading network statistics...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Entities Tab -->
+        <div id="entities" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Entity Counts</div>
+                        <div class="card-subtitle">All entities by type</div>
+                    </div>
+                </div>
+                <div id="entity-breakdown" class="entity-breakdown">
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        Loading entity information...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mods Tab -->
+        <div id="mods" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Loaded Mods</div>
+                        <div class="card-subtitle">All mods and their versions</div>
+                    </div>
+                </div>
+                <div id="mod-list" class="mod-list">
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        Loading mod information...
+                    </div>
                 </div>
             </div>
         </div>
