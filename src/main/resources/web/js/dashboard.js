@@ -690,7 +690,7 @@ class MetricsDashboard {
                 entityBreakdownElement.innerHTML = `
                     <div class="entity-grid">
                         ${filteredEntities.map(([type, count]) => `
-                            <div class="entity-tile">
+                            <div class="entity-tile clickable" data-entity-type="${type}">
                                 <div class="entity-image">${this.getEntityImage(type)}</div>
                                 <div class="entity-count-large">${count}</div>
                                 <div class="entity-type-small">${this.formatEntityType(type)}</div>
@@ -698,6 +698,9 @@ class MetricsDashboard {
                         `).join('')}
                     </div>
                 `;
+
+                // Add click handlers to entity tiles
+                this.addEntityClickHandlers(data);
             } else {
                 entityBreakdownElement.innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
@@ -1270,6 +1273,122 @@ class MetricsDashboard {
         };
 
         return entityEmojis[type] || '❓';
+    }
+
+    addEntityClickHandlers(data) {
+        const entityTiles = document.querySelectorAll('.entity-tile.clickable');
+        entityTiles.forEach(tile => {
+            tile.addEventListener('click', () => {
+                const entityType = tile.getAttribute('data-entity-type');
+                this.showEntityLocationsModal(entityType, data);
+            });
+        });
+    }
+
+    showEntityLocationsModal(entityType, data) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('entity-locations-modal');
+        if (!modal) {
+            modal = this.createEntityLocationsModal();
+            document.body.appendChild(modal);
+        }
+
+        // Get entity locations from data
+        const locations = this.getEntityLocations(entityType, data);
+        
+        // Update modal content
+        const modalTitle = modal.querySelector('.modal-title');
+        const modalContent = modal.querySelector('.modal-content');
+        
+        modalTitle.textContent = `${this.formatEntityType(entityType)} Locations (${locations.length})`;
+        
+        if (locations.length === 0) {
+            modalContent.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📍</div>
+                    <div>No locations found for this entity type</div>
+                </div>
+            `;
+        } else {
+            modalContent.innerHTML = `
+                <div class="entity-locations-list">
+                    ${locations.map(location => `
+                        <div class="location-item">
+                            <div class="location-coords">
+                                <span class="coord-label">X:</span> <span class="coord-value">${location.x}</span>
+                                <span class="coord-label">Y:</span> <span class="coord-value">${location.y}</span>
+                                <span class="coord-label">Z:</span> <span class="coord-value">${location.z}</span>
+                            </div>
+                            <div class="location-world">${this.formatWorldName(location.world)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // Show modal
+        modal.style.display = 'flex';
+    }
+
+    createEntityLocationsModal() {
+        const modal = document.createElement('div');
+        modal.id = 'entity-locations-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-backdrop"></div>
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">Entity Locations</h3>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <div class="modal-content">
+                    <!-- Content will be populated dynamically -->
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        modal.querySelector('.modal-close').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        modal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            }
+        });
+
+        return modal;
+    }
+
+    getEntityLocations(entityType, data) {
+        const locations = [];
+        
+        if (data.entity_locations_by_world && typeof data.entity_locations_by_world === 'object') {
+            for (const [worldName, worldData] of Object.entries(data.entity_locations_by_world)) {
+                if (worldData && typeof worldData === 'object' && worldData[entityType]) {
+                    locations.push(...worldData[entityType]);
+                }
+            }
+        }
+        
+        return locations;
+    }
+
+    formatWorldName(worldName) {
+        // Convert minecraft:overworld to "Overworld", etc.
+        const worldNames = {
+            'minecraft:overworld': 'Overworld',
+            'minecraft:the_nether': 'The Nether',
+            'minecraft:the_end': 'The End'
+        };
+        
+        return worldNames[worldName] || worldName.replace('minecraft:', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 }
 

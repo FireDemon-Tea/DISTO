@@ -166,26 +166,39 @@ public class JsonUtil {
         }
 
         Map<String, Object> entityCounts = new HashMap<>();
+        Map<String, Object> entityLocations = new HashMap<>();
         int totalEntities = 0;
 
         for (ServerWorld world : server.getWorlds()) {
             int worldEntities = 0;
             Map<String, Integer> worldEntityTypes = new HashMap<>();
+            Map<String, List<Map<String, Object>>> worldEntityLocations = new HashMap<>();
 
             for (Entity entity : world.iterateEntities()) {
                 if (entity != null) {
                     worldEntities++;
                     String entityType = Registries.ENTITY_TYPE.getId(entity.getType()).toString();
                     worldEntityTypes.put(entityType, worldEntityTypes.getOrDefault(entityType, 0) + 1);
+                    
+                    // Collect location data
+                    Map<String, Object> locationData = new HashMap<>();
+                    locationData.put("x", Math.round(entity.getX() * 100.0) / 100.0);
+                    locationData.put("y", Math.round(entity.getY() * 100.0) / 100.0);
+                    locationData.put("z", Math.round(entity.getZ() * 100.0) / 100.0);
+                    locationData.put("world", world.getRegistryKey().getValue().toString());
+                    
+                    worldEntityLocations.computeIfAbsent(entityType, k -> new java.util.ArrayList<>()).add(locationData);
                 }
             }
 
             totalEntities += worldEntities;
             entityCounts.put(world.getRegistryKey().getValue().toString(), worldEntityTypes);
+            entityLocations.put(world.getRegistryKey().getValue().toString(), worldEntityLocations);
         }
 
         root.put("total_entities", totalEntities);
         root.put("entity_counts_by_world", entityCounts);
+        root.put("entity_locations_by_world", entityLocations);
 
         // Summary counts
         Map<String, Integer> summaryCounts = new HashMap<>();
