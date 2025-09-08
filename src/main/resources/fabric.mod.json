@@ -1,0 +1,19 @@
+{
+    "schemaVersion": 1,
+    "id": "metricsbridge",
+    "version": "0.1.0",
+    "name": "Fabric Metrics Bridge",
+    "description": "Exposes Fabric server performance metrics over HTTP and WebSocket (read-only).",
+    "authors": ["Synderis + GPT"],
+    "contact": {},
+    "license": "MIT",
+    "environment": "server",
+    "entrypoints": {
+        "main": ["com.synderis.metricsbridge.MetricsBridgeMod"]
+    },
+    "depends": {
+        "fabricloader": ">=0.16.5",
+        "fabric-api": ">=0.130.0",
+        "minecraft": "1.21.8"
+    }
+}

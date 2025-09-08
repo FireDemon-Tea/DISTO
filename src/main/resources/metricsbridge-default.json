@@ -1,0 +1,5 @@
+{
+    "httpPort": 8765,
+    "sharedSecret": "change-me",
+    "allowOrigins": ["*"]
+}
