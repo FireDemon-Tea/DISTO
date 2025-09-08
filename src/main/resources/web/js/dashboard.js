@@ -20,9 +20,10 @@ class MetricsDashboard {
     init() {
         this.setupEventListeners();
         this.setupTabs();
-        this.startMetricsPolling();
+        this.startMetricsPolling(); // Always start auto-refresh
         this.initializeCharts();
         this.updateConnectionStatus();
+        this.loadSettings();
     }
 
     getOrPromptToken() {
@@ -37,23 +38,8 @@ class MetricsDashboard {
     }
 
     setupEventListeners() {
-        // Refresh button
-        const refreshBtn = document.getElementById('refresh-btn');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => this.fetchMetrics());
-        }
-
-        // Auto-refresh toggle
-        const autoRefreshToggle = document.getElementById('auto-refresh');
-        if (autoRefreshToggle) {
-            autoRefreshToggle.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    this.startMetricsPolling();
-                } else {
-                    this.stopMetricsPolling();
-                }
-            });
-        }
+        // Settings functionality
+        this.setupSettingsListeners();
 
         // Window visibility change
         document.addEventListener('visibilitychange', () => {
@@ -87,6 +73,82 @@ class MetricsDashboard {
         });
     }
 
+    setupSettingsListeners() {
+        // Save settings button
+        const saveBtn = document.getElementById('save-settings');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.saveSettings());
+        }
+
+        // Reset settings button
+        const resetBtn = document.getElementById('reset-settings');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => this.resetSettings());
+        }
+    }
+
+    loadSettings() {
+        const serverName = localStorage.getItem('server_name') || 'Minecraft Server Dashboard';
+        const serverNameInput = document.getElementById('server-name');
+        if (serverNameInput) {
+            serverNameInput.value = serverName;
+        }
+        this.updateServerName(serverName);
+    }
+
+    saveSettings() {
+        const serverNameInput = document.getElementById('server-name');
+        if (serverNameInput) {
+            const serverName = serverNameInput.value.trim() || 'Minecraft Server Dashboard';
+            localStorage.setItem('server_name', serverName);
+            this.updateServerName(serverName);
+            this.showSuccessMessage('Settings saved successfully!');
+        }
+    }
+
+    resetSettings() {
+        const serverNameInput = document.getElementById('server-name');
+        if (serverNameInput) {
+            serverNameInput.value = 'Minecraft Server Dashboard';
+            localStorage.setItem('server_name', 'Minecraft Server Dashboard');
+            this.updateServerName('Minecraft Server Dashboard');
+            this.showSuccessMessage('Settings reset to default!');
+        }
+    }
+
+    updateServerName(name) {
+        const logoText = document.querySelector('.logo-text');
+        if (logoText) {
+            logoText.textContent = name;
+        }
+    }
+
+    showSuccessMessage(message) {
+        // Create or update success message
+        let successElement = document.getElementById('success-message');
+        if (!successElement) {
+            successElement = document.createElement('div');
+            successElement.id = 'success-message';
+            successElement.className = 'success-state';
+            document.body.insertBefore(successElement, document.body.firstChild);
+        }
+        
+        successElement.innerHTML = `
+            <div class="success-icon">✅</div>
+            <div>${message}</div>
+            <button onclick="this.parentElement.remove()" class="btn btn-primary" style="margin-top: 1rem;">
+                Dismiss
+            </button>
+        `;
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (successElement && successElement.parentElement) {
+                successElement.remove();
+            }
+        }, 3000);
+    }
+
     async fetchMetrics() {
         if (!this.token) {
             this.showError('No authentication token provided');
@@ -94,7 +156,6 @@ class MetricsDashboard {
         }
 
         try {
-            this.setLoadingState(true);
             const response = await fetch(`/api/metrics?token=${encodeURIComponent(this.token)}`);
             
             if (!response.ok) {
@@ -106,14 +167,12 @@ class MetricsDashboard {
             this.isConnected = true;
             this.lastUpdate = new Date();
             this.updateConnectionStatus();
-            this.setLoadingState(false);
 
         } catch (error) {
             console.error('Failed to fetch metrics:', error);
             this.showError(`Connection failed: ${error.message}`);
             this.isConnected = false;
             this.updateConnectionStatus();
-            this.setLoadingState(false);
         }
     }
 
@@ -444,18 +503,6 @@ class MetricsDashboard {
         }
     }
 
-    setLoadingState(loading) {
-        const refreshBtn = document.getElementById('refresh-btn');
-        const spinner = document.getElementById('refresh-spinner');
-        
-        if (loading) {
-            if (refreshBtn) refreshBtn.disabled = true;
-            if (spinner) spinner.style.display = 'inline-block';
-        } else {
-            if (refreshBtn) refreshBtn.disabled = false;
-            if (spinner) spinner.style.display = 'none';
-        }
-    }
 
     showError(message) {
         // Create or update error message

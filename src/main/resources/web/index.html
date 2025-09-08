@@ -26,14 +26,6 @@
     <main class="main">
         <!-- Controls -->
         <div class="controls">
-            <button id="refresh-btn" class="btn btn-primary">
-                <span id="refresh-spinner" class="refresh-spinner" style="display: none;"></span>
-                Refresh
-            </button>
-            <label class="btn">
-                <input type="checkbox" id="auto-refresh" checked>
-                Auto-refresh
-            </label>
             <div class="refresh-indicator">
                 <span>Last update: <span id="last-refresh">Never</span></span>
             </div>
@@ -45,6 +37,7 @@
             <button class="tab" data-tab="system">System</button>
             <button class="tab" data-tab="players">Players</button>
             <button class="tab" data-tab="network">Network</button>
+            <button class="tab" data-tab="settings">Settings</button>
         </div>
 
         <!-- Performance Tab -->
@@ -193,6 +186,31 @@
                     <div id="version" class="metric-value">—</div>
                     <div class="metric-unit">minecraft</div>
                     <div id="version-trend" class="metric-trend">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="grid grid-1">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Dashboard Settings</div>
+                            <div class="card-subtitle">Configure your dashboard preferences</div>
+                        </div>
+                    </div>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label for="server-name" class="form-label">Server Name</label>
+                            <input type="text" id="server-name" class="form-input" placeholder="Enter server name">
+                            <div class="form-help">This name will be displayed in the dashboard header</div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="save-settings" class="btn btn-primary">Save Settings</button>
+                            <button id="reset-settings" class="btn">Reset to Default</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

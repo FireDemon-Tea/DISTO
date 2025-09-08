@@ -431,6 +431,24 @@ body {
   opacity: 0.5;
 }
 
+/* Success States */
+.success-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--success-color);
+  border-radius: var(--radius-lg);
+  margin: 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.success-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+}
+
 /* Loading States */
 .loading {
   opacity: 0.6;
@@ -488,6 +506,60 @@ body {
   .metric-value {
     font-size: 1.75rem;
   }
+}
+
+/* Settings Form */
+.settings-form {
+  max-width: 500px;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-help {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.grid-1 {
+  grid-template-columns: 1fr;
 }
 
 /* Dark mode support */
