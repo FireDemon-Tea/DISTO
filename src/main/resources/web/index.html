@@ -37,7 +37,7 @@
             <button class="tab" data-tab="system">System</button>
             <button class="tab" data-tab="players">Players</button>
             <button class="tab" data-tab="network">Network</button>
-            <button class="tab" data-tab="settings">Settings</button>
+            <button class="tab" data-tab="console">Console</button>
         </div>
 
         <!-- Performance Tab -->
@@ -190,25 +190,25 @@
             </div>
         </div>
 
-        <!-- Settings Tab -->
-        <div id="settings" class="tab-content">
+        <!-- Console Tab -->
+        <div id="console" class="tab-content">
             <div class="grid grid-1">
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <div class="card-title">Dashboard Settings</div>
-                            <div class="card-subtitle">Configure your dashboard preferences</div>
+                            <div class="card-title">Server Console</div>
+                            <div class="card-subtitle">Execute commands and view server output</div>
+                        </div>
+                        <div class="console-controls">
+                            <button id="clear-console" class="btn">Clear</button>
+                            <button id="pause-console" class="btn">Pause</button>
                         </div>
                     </div>
-                    <div class="settings-form">
-                        <div class="form-group">
-                            <label for="server-name" class="form-label">Server Name</label>
-                            <input type="text" id="server-name" class="form-input" placeholder="Enter server name">
-                            <div class="form-help">This name will be displayed in the dashboard header</div>
-                        </div>
-                        <div class="form-actions">
-                            <button id="save-settings" class="btn btn-primary">Save Settings</button>
-                            <button id="reset-settings" class="btn">Reset to Default</button>
+                    <div class="console-container">
+                        <div id="console-output" class="console-output"></div>
+                        <div class="console-input-container">
+                            <input type="text" id="console-input" class="console-input" placeholder="Enter server command...">
+                            <button id="console-send" class="btn btn-primary">Send</button>
                         </div>
                     </div>
                 </div>

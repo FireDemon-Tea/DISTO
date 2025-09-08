@@ -21,11 +21,7 @@ dependencies {
   modImplementation "net.fabricmc:fabric-loader:0.16.5"
   modImplementation "net.fabricmc.fabric-api:fabric-api:0.130.0+1.21.8"
 
-  implementation("io.javalin:javalin:6.1.3") {
-    exclude group: 'org.eclipse.jetty.websocket', module: 'websocket-jetty-server'
-    exclude group: 'org.eclipse.jetty.websocket', module: 'websocket-servlet'
-    exclude group: 'org.eclipse.jetty.websocket', module: 'websocket-core-server'
-  }
+  implementation("io.javalin:javalin:6.1.3")
   implementation "org.slf4j:slf4j-simple:2.0.13"
   implementation "com.fasterxml.jackson.core:jackson-databind:2.16.1"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.25"
@@ -38,10 +34,12 @@ dependencies {
   implementation "org.eclipse.jetty:jetty-util:11.0.24"
   implementation "org.eclipse.jetty:jetty-security:11.0.24"
   implementation "org.eclipse.jetty:jetty-webapp:11.0.24"
-  // Websocket dependencies removed to fix startup issues
+  // WebSocket dependencies temporarily disabled due to Javalin compatibility issues
   // implementation "org.eclipse.jetty.websocket:websocket-jetty-server:11.0.24"
   // implementation "org.eclipse.jetty.websocket:websocket-servlet:11.0.24"
   // implementation "org.eclipse.jetty.websocket:websocket-core-server:11.0.24"
+  // implementation "org.eclipse.jetty.websocket:websocket-core-common:11.0.24"
+  // implementation "jakarta.websocket:jakarta.websocket-api:2.1.0"
   
   include "io.javalin:javalin:6.1.3"
   include "org.slf4j:slf4j-simple:2.0.13"
@@ -56,8 +54,10 @@ dependencies {
   include "org.eclipse.jetty:jetty-util:11.0.24"
   include "org.eclipse.jetty:jetty-security:11.0.24"
   include "org.eclipse.jetty:jetty-webapp:11.0.24"
-  // Websocket dependencies removed to fix startup issues
+  // WebSocket dependencies temporarily disabled due to Javalin compatibility issues
   // include "org.eclipse.jetty.websocket:websocket-jetty-server:11.0.24"
   // include "org.eclipse.jetty.websocket:websocket-servlet:11.0.24"
   // include "org.eclipse.jetty.websocket:websocket-core-server:11.0.24"
+  // include "org.eclipse.jetty.websocket:websocket-core-common:11.0.24"
+  // include "jakarta.websocket:jakarta.websocket-api:2.1.0"
 }

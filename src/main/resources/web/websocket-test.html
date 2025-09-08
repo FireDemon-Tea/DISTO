@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Console Output Test</h1>
+        <p><strong>Note:</strong> WebSocket functionality is temporarily disabled due to dependency conflicts. Using HTTP polling instead.</p>
+        
+        <div id="status" class="status disconnected">
+            Status: HTTP Polling Mode
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="token" placeholder="Enter token" value="change-me">
+            <button onclick="testConnection()">Test Connection</button>
+            <button onclick="testAuthenticated()">Test Authenticated</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            log.textContent += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function updateStatus(connected) {
+            if (connected) {
+                status.textContent = 'Status: Connected';
+                status.className = 'status connected';
+            } else {
+                status.textContent = 'Status: Disconnected';
+                status.className = 'status disconnected';
+            }
+        }
+        
+        function testConnection() {
+            addLog('Testing HTTP endpoint connectivity...');
+            
+            fetch('/api/test')
+                .then(response => response.json())
+                .then(data => {
+                    addLog(`✅ HTTP endpoint working: ${JSON.stringify(data)}`);
+                    updateStatus(true);
+                })
+                .catch(error => {
+                    addLog(`🚨 HTTP endpoint error: ${error.message}`);
+                    updateStatus(false);
+                });
+        }
+        
+        function testAuthenticated() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                addLog('❌ Please enter a token');
+                return;
+            }
+            
+            addLog(`Testing authenticated console endpoint with token: ${token.replace(/./g, '*')}`);
+            
+            fetch(`/api/console/history?token=${encodeURIComponent(token)}`)
+                .then(response => response.json())
+                .then(data => {
+                    addLog(`✅ Console endpoint working! Found ${data.console_output ? data.console_output.length : 0} console lines`);
+                    if (data.console_output && data.console_output.length > 0) {
+                        addLog(`📺 Latest console line: ${data.console_output[data.console_output.length - 1]}`);
+                    }
+                    updateStatus(true);
+                })
+                .catch(error => {
+                    addLog(`🚨 Console endpoint error: ${error.message}`);
+                    updateStatus(false);
+                });
+        }
+        
+        function clearLog() {
+            log.textContent = '';
+        }
+        
+        // Test server connectivity on page load
+        window.onload = () => {
+            addLog('🚀 Console output test page loaded');
+            addLog('Click "Test Connection" to test basic HTTP connectivity');
+            addLog('Click "Test Authenticated" to test the console history endpoint');
+        };
+    </script>
+</body>
+</html>

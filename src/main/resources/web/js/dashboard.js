@@ -13,6 +13,8 @@ class MetricsDashboard {
         this.isConnected = false;
         this.lastUpdate = null;
         this.charts = {};
+        this.ws = null;
+        this.wsConnected = false;
         
         this.init();
     }
@@ -20,10 +22,14 @@ class MetricsDashboard {
     init() {
         this.setupEventListeners();
         this.setupTabs();
+        this.setupConsole();
         this.startMetricsPolling(); // Always start auto-refresh
         this.initializeCharts();
         this.updateConnectionStatus();
         this.loadSettings();
+        // WebSocket temporarily disabled - using HTTP polling instead
+        // this.connectWebSocket();
+        this.startConsolePolling();
     }
 
     getOrPromptToken() {
@@ -45,8 +51,10 @@ class MetricsDashboard {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 this.stopMetricsPolling();
+                this.stopConsolePolling();
             } else {
                 this.startMetricsPolling();
+                this.startConsolePolling();
             }
         });
     }
@@ -71,6 +79,52 @@ class MetricsDashboard {
                 }
             });
         });
+    }
+
+    setupConsole() {
+        this.consoleHistory = [];
+        this.consoleHistoryIndex = -1;
+        this.consolePaused = false;
+        
+        const consoleInput = document.getElementById('console-input');
+        const consoleSend = document.getElementById('console-send');
+        const consoleOutput = document.getElementById('console-output');
+        const clearConsole = document.getElementById('clear-console');
+        const pauseConsole = document.getElementById('pause-console');
+
+        if (consoleInput && consoleSend) {
+            consoleSend.addEventListener('click', () => this.sendConsoleCommand());
+            consoleInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.sendConsoleCommand();
+                }
+            });
+            
+            // Console history navigation
+            consoleInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateConsoleHistory(-1);
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.navigateConsoleHistory(1);
+                }
+            });
+        }
+
+        if (clearConsole) {
+            clearConsole.addEventListener('click', () => this.clearConsole());
+        }
+
+        if (pauseConsole) {
+            pauseConsole.addEventListener('click', () => this.toggleConsolePause());
+        }
+
+
+        // Add welcome message
+        this.addConsoleLine('Server Console Ready', 'info');
+        this.addConsoleLine('Type a command and press Enter to execute', 'info');
+        this.addConsoleLine('Connecting to live console stream...', 'info');
     }
 
     setupSettingsListeners() {
@@ -566,6 +620,243 @@ class MetricsDashboard {
             `;
         }
     }
+
+    // HTTP polling for console output (WebSocket alternative)
+    startConsolePolling() {
+        this.addConsoleLine('Starting console output polling...', 'info');
+        this.consolePollingInterval = setInterval(() => {
+            this.fetchConsoleOutput();
+        }, 2000); // Poll every 2 seconds
+        
+        // Initial fetch
+        this.fetchConsoleOutput();
+    }
+
+    stopConsolePolling() {
+        if (this.consolePollingInterval) {
+            clearInterval(this.consolePollingInterval);
+            this.consolePollingInterval = null;
+        }
+    }
+
+    async fetchConsoleOutput() {
+        if (!this.token) return;
+
+        try {
+            const response = await fetch(`/api/console/history?token=${encodeURIComponent(this.token)}`);
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    this.addConsoleLine('Authentication failed - check your token', 'error');
+                    this.stopConsolePolling();
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.console_output && Array.isArray(data.console_output)) {
+                // Initialize history if not set
+                if (!this.consoleOutputHistory) {
+                    this.consoleOutputHistory = [];
+                }
+                
+                // Handle case where console output was reset (server restart, etc.)
+                if (data.console_output.length < this.consoleOutputHistory.length) {
+                    this.addConsoleLine('[INFO] Console output was reset (server restart?)', 'info');
+                    this.consoleOutputHistory = [];
+                }
+                
+                // Find new lines by comparing content, not just length
+                const newLines = [];
+                for (let i = this.consoleOutputHistory.length; i < data.console_output.length; i++) {
+                    newLines.push(data.console_output[i]);
+                }
+                
+                // Add new lines to console
+                if (newLines.length > 0) {
+                    for (const line of newLines) {
+                        this.addConsoleLine(line, 'server');
+                    }
+                }
+                
+                // Update our history
+                this.consoleOutputHistory = [...data.console_output];
+            }
+
+        } catch (error) {
+            console.error('Failed to fetch console output:', error);
+            this.addConsoleLine(`Console polling error: ${error.message}`, 'error');
+        }
+    }
+
+    // WebSocket methods (temporarily disabled)
+    connectWebSocket() {
+        if (!this.token) {
+            this.addConsoleLine('No authentication token available for WebSocket connection', 'error');
+            return;
+        }
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(this.token)}`;
+        
+        this.addConsoleLine(`Attempting to connect to WebSocket: ${wsUrl.replace(this.token, '***')}`, 'info');
+        
+        try {
+            this.ws = new WebSocket(wsUrl);
+            
+            this.ws.onopen = () => {
+                this.wsConnected = true;
+                this.addConsoleLine('WebSocket connected - receiving live console output', 'success');
+            };
+            
+            this.ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'console') {
+                        this.addConsoleLine(message.data, 'server');
+                    }
+                } catch (e) {
+                    console.error('Failed to parse WebSocket message:', e);
+                    this.addConsoleLine(`Failed to parse WebSocket message: ${e.message}`, 'error');
+                }
+            };
+            
+            this.ws.onclose = (event) => {
+                this.wsConnected = false;
+                this.addConsoleLine(`WebSocket disconnected (code: ${event.code}, reason: ${event.reason || 'No reason provided'}) - reconnecting...`, 'warning');
+                // Reconnect after 3 seconds
+                setTimeout(() => this.connectWebSocket(), 3000);
+            };
+            
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.addConsoleLine(`WebSocket connection error: ${error.message || 'Unknown error'}`, 'error');
+            };
+            
+        } catch (error) {
+            console.error('Failed to create WebSocket connection:', error);
+            this.addConsoleLine(`Failed to create WebSocket connection: ${error.message}`, 'error');
+        }
+    }
+
+    disconnectWebSocket() {
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+            this.wsConnected = false;
+        }
+    }
+
+    // Console methods
+    sendConsoleCommand() {
+        const consoleInput = document.getElementById('console-input');
+        if (!consoleInput) return;
+
+        const command = consoleInput.value.trim();
+        if (!command) return;
+
+        // Add to history
+        this.consoleHistory.push(command);
+        this.consoleHistoryIndex = this.consoleHistory.length;
+
+        // Display command
+        this.addConsoleLine(`> ${command}`, 'command');
+
+        // Send command to server
+        this.executeServerCommand(command);
+
+        // Clear input
+        consoleInput.value = '';
+    }
+
+    async executeServerCommand(command) {
+        try {
+            const response = await fetch(`/api/console?token=${encodeURIComponent(this.token)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ command: command })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.addConsoleLine(result.output || 'Command executed successfully', 'success');
+            } else {
+                this.addConsoleLine(result.error || 'Command failed', 'error');
+            }
+        } catch (error) {
+            this.addConsoleLine(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    addConsoleLine(text, type = 'output') {
+        const consoleOutput = document.getElementById('console-output');
+        if (!consoleOutput) return;
+
+        const line = document.createElement('div');
+        line.className = `console-line ${type}`;
+        
+        // Don't add timestamp for server output as it already has one
+        if (type === 'server') {
+            line.textContent = text;
+        } else {
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+        }
+        
+        consoleOutput.appendChild(line);
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        
+        // Limit console output to prevent memory issues
+        const maxLines = 500;
+        while (consoleOutput.children.length > maxLines) {
+            consoleOutput.removeChild(consoleOutput.firstChild);
+        }
+    }
+
+    clearConsole() {
+        const consoleOutput = document.getElementById('console-output');
+        if (consoleOutput) {
+            consoleOutput.innerHTML = '';
+            this.addConsoleLine('Console cleared', 'info');
+        }
+    }
+
+    toggleConsolePause() {
+        this.consolePaused = !this.consolePaused;
+        const pauseBtn = document.getElementById('pause-console');
+        if (pauseBtn) {
+            pauseBtn.textContent = this.consolePaused ? 'Resume' : 'Pause';
+        }
+        this.addConsoleLine(`Console ${this.consolePaused ? 'paused' : 'resumed'}`, 'info');
+    }
+
+    navigateConsoleHistory(direction) {
+        if (this.consoleHistory.length === 0) return;
+
+        const consoleInput = document.getElementById('console-input');
+        if (!consoleInput) return;
+
+        this.consoleHistoryIndex += direction;
+        
+        if (this.consoleHistoryIndex < 0) {
+            this.consoleHistoryIndex = 0;
+        } else if (this.consoleHistoryIndex >= this.consoleHistory.length) {
+            this.consoleHistoryIndex = this.consoleHistory.length;
+            consoleInput.value = '';
+            return;
+        }
+
+        consoleInput.value = this.consoleHistory[this.consoleHistoryIndex];
+    }
+
 
     // Utility methods
     formatBytes(bytes) {

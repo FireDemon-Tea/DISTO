@@ -36,7 +36,7 @@ public class MetricsBridgeMod implements ModInitializer {
             Map<String, Object> cfg = JsonUtil.loadConfig();
             int port = ((Number) cfg.getOrDefault("httpPort", 8765)).intValue();
             String token = (String) cfg.getOrDefault("sharedSecret", "change-me");
-            webServer = new WebServer(port, token, () -> JsonUtil.metricsJson(server, sampler));
+            webServer = new WebServer(port, token, () -> JsonUtil.metricsJson(server, sampler), () -> server);
             webServer.start();
             System.out.println("[MetricsBridge] HTTP server started on :" + port);
         });

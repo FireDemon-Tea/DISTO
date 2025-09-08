@@ -562,6 +562,109 @@ body {
   grid-template-columns: 1fr;
 }
 
+/* Console Styles */
+.console-container {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.console-output {
+  flex: 1;
+  padding: 1rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  background: #1a1a1a;
+  color: #00ff00;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.console-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.console-output::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+
+.console-output::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.console-output::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+.console-input-container {
+  display: flex;
+  padding: 1rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  gap: 0.5rem;
+}
+
+.console-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+}
+
+.console-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.console-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.console-line {
+  margin-bottom: 0.25rem;
+}
+
+.console-line.error {
+  color: #ff6b6b;
+}
+
+.console-line.warning {
+  color: #ffd93d;
+}
+
+.console-line.info {
+  color: #4dabf7;
+}
+
+.console-line.success {
+  color: #51cf66;
+}
+
+.console-line.command {
+  color: #ffd43b;
+}
+
+.console-line.output {
+  color: #00ff00;
+}
+
+.console-line.server {
+  color: #ffffff;
+}
+
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   :root {
