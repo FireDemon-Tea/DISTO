@@ -40,6 +40,7 @@
             <button class="tab" data-tab="entities">Entities</button>
             <button class="tab" data-tab="mods">Mods</button>
             <button class="tab" data-tab="console">Console</button>
+            <button class="tab admin-tab" data-tab="admin" style="display: none;">Admin</button>
         </div>
 
         <!-- Performance Tab -->
@@ -286,6 +287,45 @@
                         <div class="console-input-container">
                             <input type="text" id="console-input" class="console-input" placeholder="Enter server command...">
                             <button id="console-send" class="btn btn-primary">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Tab -->
+        <div id="admin" class="tab-content">
+            <div class="admin-container">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">User Management</div>
+                        <div class="card-subtitle">Manage dashboard users and permissions</div>
+                    </div>
+                    <div class="admin-content">
+                        <div class="admin-actions">
+                            <button id="create-user-btn" class="btn btn-primary">
+                                <span class="btn-icon">➕</span>
+                                Create User
+                            </button>
+                        </div>
+                        
+                        <div class="users-table-container">
+                            <table class="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Admin</th>
+                                        <th>Created</th>
+                                        <th>Last Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr>
+                                        <td colspan="5" class="loading-row">Loading users...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

@@ -6,6 +6,9 @@
 class MetricsDashboard {
     constructor() {
         this.token = this.getOrPromptToken();
+        this.sessionToken = null;
+        this.isAuthenticated = false;
+        this.userInfo = null;
         this.metrics = {};
         this.history = [];
         this.maxHistoryLength = 100;
@@ -21,16 +24,8 @@ class MetricsDashboard {
     }
 
     init() {
-        this.setupEventListeners();
-        this.setupTabs();
-        this.setupConsole();
-        this.startMetricsPolling(); // Always start auto-refresh
-        this.initializeCharts();
-        this.updateConnectionStatus();
-        this.loadSettings();
-        // WebSocket temporarily disabled - using HTTP polling instead
-        // this.connectWebSocket();
-        this.startConsolePolling();
+        // Don't start any API calls until we're authenticated
+        this.checkAuthentication();
     }
 
     getOrPromptToken() {
@@ -44,6 +39,679 @@ class MetricsDashboard {
         return token;
     }
 
+    async isServerAvailable() {
+        try {
+            // Try a simple health check endpoint
+            const response = await fetch('/api/session', {
+                method: 'HEAD',
+                headers: {
+                    'X-Session-Token': this.sessionToken || 'dummy'
+                }
+            });
+            return response.status !== 0; // 0 means connection refused
+        } catch (error) {
+            return false; // Any error means server not available
+        }
+    }
+
+    async checkAuthentication() {
+        // Check if we have a session token
+        this.sessionToken = localStorage.getItem('session_token');
+        if (this.sessionToken) {
+            try {
+                const response = await fetch('/api/session', {
+                    headers: {
+                        'X-Session-Token': this.sessionToken
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    this.isAuthenticated = true;
+                    this.userInfo = data;
+                    this.initializeDashboard();
+                    return;
+                } else {
+                    // Invalid session, clear it
+                    localStorage.removeItem('session_token');
+                    this.sessionToken = null;
+                }
+            } catch (error) {
+                console.log('Session check failed (server may not be running):', error.message);
+                // Don't clear the session token if server is just not running
+                // Keep it so user can login when server starts
+                this.sessionToken = null;
+            }
+        }
+        
+        // Not authenticated or server not running, show login form
+        this.showLoginForm();
+    }
+
+    showLoginForm() {
+        document.body.innerHTML = `
+            <div class="login-container">
+                <div class="login-card">
+                    <div class="login-header">
+                        <h1>Minecraft Metrics Dashboard</h1>
+                        <p>Please log in to access the dashboard</p>
+                    </div>
+                    
+                    <form id="login-form" class="login-form">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" required 
+                                   placeholder="Enter your username">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required 
+                                   placeholder="Enter your password">
+                        </div>
+                        <button type="submit" class="login-btn">
+                            <span class="login-icon">🔐</span>
+                            Login
+                        </button>
+                    </form>
+                    
+                    <div id="login-error" class="login-error" style="display: none;"></div>
+                </div>
+            </div>
+        `;
+
+        // Add event listener for login form
+        const loginForm = document.getElementById('login-form');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
+
+        // Add Enter key listener to password field
+        const passwordField = document.getElementById('password');
+        if (passwordField) {
+            passwordField.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleLogin();
+                }
+            });
+        }
+    }
+
+
+    async handleLogin() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('login-error');
+        const submitBtn = document.querySelector('#login-form .login-btn');
+        
+        console.log('Login attempt for user:', username);
+        
+        if (!username) {
+            this.showLoginError('Please enter a username');
+            return;
+        }
+        
+        if (!password) {
+            this.showLoginError('Please enter a password');
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="login-icon">⏳</span> Logging in...';
+        errorDiv.style.display = 'none';
+
+        try {
+            console.log('Sending login request...');
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            console.log('Login response status:', response.status);
+            const data = await response.json();
+            console.log('Login response data:', data);
+
+            if (data.success) {
+                console.log('Login successful, initializing dashboard...');
+                this.sessionToken = data.sessionToken;
+                this.isAuthenticated = true;
+                this.userInfo = data;
+                
+                // Store session token
+                localStorage.setItem('session_token', this.sessionToken);
+                
+                // Refresh the page to show the dashboard
+                console.log('Login successful, refreshing page...');
+                window.location.reload();
+            } else {
+                console.log('Login failed:', data.error);
+                this.showLoginError(data.error || 'Login failed');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            this.showLoginError('Connection error. Please try again.');
+        } finally {
+            // Reset button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="login-icon">🔐</span> Login';
+        }
+    }
+
+
+    showLoginError(message, type = 'error') {
+        const errorDiv = document.getElementById('login-error');
+        errorDiv.textContent = message;
+        errorDiv.className = `login-error ${type}`;
+        errorDiv.style.display = 'block';
+    }
+
+    initializeDashboard() {
+        // Only initialize if we're actually authenticated
+        if (!this.isAuthenticated || !this.sessionToken) {
+            console.log('Not authenticated, skipping dashboard initialization');
+            return;
+        }
+        
+        console.log('Initializing dashboard for authenticated user');
+        
+        // Load the main dashboard HTML
+        this.loadDashboardHTML();
+        
+        // Initialize dashboard components
+        this.setupEventListeners();
+        this.setupTabs();
+        this.setupConsole();
+        this.startMetricsPolling();
+        this.initializeCharts();
+        this.updateConnectionStatus();
+        this.loadSettings();
+        
+        // Check console access based on admin status
+        this.checkConsoleAccess();
+        
+        // Add logout functionality
+        this.addLogoutButton();
+        
+        // Initialize admin portal if user is admin
+        this.initializeAdminPortal();
+    }
+
+    loadDashboardHTML() {
+        console.log('Loading dashboard HTML...');
+        
+        // Hide login form and show dashboard content
+        const loginContainer = document.querySelector('.login-container');
+        if (loginContainer) {
+            console.log('Hiding login container');
+            loginContainer.style.display = 'none';
+        } else {
+            console.log('Login container not found');
+        }
+        
+        // Show the main dashboard content
+        const header = document.querySelector('.header');
+        const main = document.querySelector('.main');
+        
+        if (header) {
+            console.log('Showing header');
+            header.style.display = 'block';
+        } else {
+            console.log('Header not found');
+        }
+        
+        if (main) {
+            console.log('Showing main content');
+            main.style.display = 'block';
+        } else {
+            console.log('Main content not found');
+        }
+        
+        console.log('Dashboard HTML loading complete');
+    }
+
+    addLogoutButton() {
+        // Add logout button to the header
+        const header = document.querySelector('.header');
+        if (header && this.userInfo) {
+            const userInfo = document.createElement('div');
+            userInfo.className = 'user-info';
+            userInfo.innerHTML = `
+                <span class="user-name">${this.userInfo.displayName}</span>
+                ${this.userInfo.isAdmin ? '<span class="op-badge">Admin</span>' : ''}
+                <button class="btn btn-secondary btn-small" onclick="dashboard.showChangePasswordModal()">Change Password</button>
+                <button class="logout-btn" onclick="dashboard.logout()">Logout</button>
+            `;
+            header.appendChild(userInfo);
+        }
+    }
+
+    async logout() {
+        try {
+            if (this.sessionToken) {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'X-Session-Token': this.sessionToken
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Clear session data
+            localStorage.removeItem('session_token');
+            this.sessionToken = null;
+            this.isAuthenticated = false;
+            this.userInfo = null;
+            
+            // Show login form again
+            this.showLoginForm();
+        }
+    }
+
+    hideConsoleForNonOp() {
+        // Hide console tab and content for non-OP users
+        const consoleTab = document.querySelector('[data-tab="console"]');
+        const consoleContent = document.getElementById('console');
+        
+        if (consoleTab) {
+            consoleTab.style.display = 'none';
+        }
+        if (consoleContent) {
+            consoleContent.style.display = 'none';
+        }
+        
+        // Stop console polling
+        this.stopConsolePolling();
+    }
+
+    checkConsoleAccess() {
+        // Check if user has admin access for console and admin portal
+        if (!this.userInfo || !this.userInfo.isAdmin) {
+            this.hideConsoleForNonOp();
+            this.hideAdminForNonAdmin();
+        }
+    }
+
+    hideAdminForNonAdmin() {
+        // Hide admin tab for non-admin users
+        const adminTab = document.querySelector('[data-tab="admin"]');
+        if (adminTab) {
+            adminTab.style.display = 'none';
+        }
+    }
+
+    initializeAdminPortal() {
+        // Only initialize if user is admin
+        if (!this.userInfo || !this.userInfo.isAdmin) {
+            return;
+        }
+
+        // Show admin tab
+        const adminTab = document.querySelector('[data-tab="admin"]');
+        if (adminTab) {
+            adminTab.style.display = 'block';
+        }
+
+        // Setup admin event listeners
+        this.setupAdminEventListeners();
+        
+        // Load users
+        this.loadUsers();
+    }
+
+    setupAdminEventListeners() {
+        // Create user button
+        const createUserBtn = document.getElementById('create-user-btn');
+        if (createUserBtn) {
+            createUserBtn.addEventListener('click', () => this.showCreateUserModal());
+        }
+
+    }
+
+    async loadUsers() {
+        try {
+            const response = await fetch('/api/admin/users', {
+                headers: {
+                    'X-Session-Token': this.sessionToken
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                this.displayUsers(data.users);
+            } else {
+                this.showNotification('Failed to load users: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load users:', error);
+            this.showNotification('Failed to load users: ' + error.message, 'error');
+        }
+    }
+
+    displayUsers(users) {
+        const tbody = document.getElementById('users-table-body');
+        if (!tbody) return;
+
+        if (!users || Object.keys(users).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="loading-row">No users found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = Object.values(users).map(user => `
+            <tr>
+                <td>${user.username}</td>
+                <td>${user.isAdmin ? '<span class="admin-badge">Admin</span>' : '<span class="user-badge">User</span>'}</td>
+                <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                <td>${new Date(user.lastModified).toLocaleDateString()}</td>
+                <td>
+                    <div class="action-buttons">
+                        ${user.username !== this.userInfo.username && user.username.toLowerCase() !== 'admin' ? `
+                            <button class="btn btn-small btn-warning" onclick="dashboard.toggleAdminStatus('${user.username}', ${!user.isAdmin})">
+                                ${user.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                            </button>
+                            <button class="btn btn-small btn-danger" onclick="dashboard.deleteUser('${user.username}')">
+                                Delete
+                            </button>
+                        ` : user.username === this.userInfo.username ? '<span class="text-muted">Current User</span>' : '<span class="text-muted">Original Admin</span>'}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    showCreateUserModal() {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('create-user-modal');
+        if (!modal) {
+            modal = this.createUserModal();
+            document.body.appendChild(modal);
+        }
+
+        // Reset form
+        const form = modal.querySelector('#create-user-form');
+        form.reset();
+        
+        // Show modal
+        modal.style.display = 'flex';
+    }
+
+    createUserModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-user-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">Create New User</h3>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <form id="create-user-form" class="modal-content">
+                    <div class="form-group">
+                        <label for="new-username">Username</label>
+                        <input type="text" id="new-username" name="username" required 
+                               placeholder="Enter username">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">Password</label>
+                        <input type="password" id="new-password" name="password" required 
+                               placeholder="Enter password (min 6 characters)">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-is-admin">
+                            <input type="checkbox" id="new-is-admin" name="isAdmin">
+                            Admin privileges
+                        </label>
+                    </div>
+                </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').style.display='none'">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="dashboard.createUser()">
+                        Create User
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        modal.querySelector('.modal-close').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        return modal;
+    }
+
+    async createUser() {
+        const form = document.getElementById('create-user-form');
+        const formData = new FormData(form);
+        
+        const username = formData.get('username').trim();
+        const password = formData.get('password');
+        const isAdmin = formData.get('isAdmin') === 'on';
+
+        if (!username) {
+            this.showNotification('Username is required', 'error');
+            return;
+        }
+
+        if (!password || password.length < 6) {
+            this.showNotification('Password must be at least 6 characters long', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': this.sessionToken
+                },
+                body: JSON.stringify({ username, password, isAdmin })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showNotification('User created successfully', 'success');
+                document.getElementById('create-user-modal').style.display = 'none';
+                this.loadUsers(); // Refresh the user list
+            } else {
+                this.showNotification('Failed to create user: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to create user:', error);
+            this.showNotification('Failed to create user: ' + error.message, 'error');
+        }
+    }
+
+    async toggleAdminStatus(username, isAdmin) {
+        if (!confirm(`Are you sure you want to ${isAdmin ? 'grant' : 'remove'} admin privileges for ${username}?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/${username}/admin`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': this.sessionToken
+                },
+                body: JSON.stringify({ isAdmin })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showNotification(`Admin status updated for ${username}`, 'success');
+                this.loadUsers(); // Refresh the user list
+            } else {
+                this.showNotification('Failed to update admin status: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to update admin status:', error);
+            this.showNotification('Failed to update admin status: ' + error.message, 'error');
+        }
+    }
+
+    async deleteUser(username) {
+        if (!confirm(`Are you sure you want to delete user ${username}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/${username}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Session-Token': this.sessionToken
+                }
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showNotification(`User ${username} deleted successfully`, 'success');
+                this.loadUsers(); // Refresh the user list
+            } else {
+                this.showNotification('Failed to delete user: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to delete user:', error);
+            this.showNotification('Failed to delete user: ' + error.message, 'error');
+        }
+    }
+
+    showChangePasswordModal() {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('change-password-modal');
+        if (!modal) {
+            modal = this.createChangePasswordModal();
+            document.body.appendChild(modal);
+        }
+
+        // Reset form
+        const form = modal.querySelector('#change-password-form');
+        form.reset();
+        
+        // Show modal
+        modal.style.display = 'flex';
+    }
+
+    createChangePasswordModal() {
+        const modal = document.createElement('div');
+        modal.id = 'change-password-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="modal-title">Change Password</h3>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <form id="change-password-form" class="modal-content">
+                    <div class="form-group">
+                        <label for="old-password">Current Password</label>
+                        <input type="password" id="old-password" name="oldPassword" required 
+                               placeholder="Enter current password">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-password">New Password</label>
+                        <input type="password" id="new-password" name="newPassword" required 
+                               placeholder="Enter new password (min 6 characters)">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-new-password">Confirm New Password</label>
+                        <input type="password" id="confirm-new-password" name="confirmPassword" required 
+                               placeholder="Confirm new password">
+                    </div>
+                </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').style.display='none'">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="dashboard.changePassword()">
+                        Change Password
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        modal.querySelector('.modal-close').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        return modal;
+    }
+
+    async changePassword() {
+        const form = document.getElementById('change-password-form');
+        const formData = new FormData(form);
+        
+        const oldPassword = formData.get('oldPassword');
+        const newPassword = formData.get('newPassword');
+        const confirmPassword = formData.get('confirmPassword');
+
+        if (!oldPassword) {
+            this.showNotification('Current password is required', 'error');
+            return;
+        }
+
+        if (!newPassword || newPassword.length < 6) {
+            this.showNotification('New password must be at least 6 characters long', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            this.showNotification('New passwords do not match', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': this.sessionToken
+                },
+                body: JSON.stringify({ oldPassword, newPassword, confirmPassword })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showNotification('Password changed successfully', 'success');
+                document.getElementById('change-password-modal').style.display = 'none';
+            } else {
+                this.showNotification('Failed to change password: ' + data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to change password:', error);
+            this.showNotification('Failed to change password: ' + error.message, 'error');
+        }
+    }
+
     setupEventListeners() {
         // Settings functionality
         this.setupSettingsListeners();
@@ -53,7 +721,7 @@ class MetricsDashboard {
             if (document.hidden) {
                 this.stopMetricsPolling();
                 this.stopConsolePolling();
-            } else {
+            } else if (this.isAuthenticated && this.sessionToken) {
                 this.startMetricsPolling();
                 this.startConsolePolling();
             }
@@ -202,15 +870,24 @@ class MetricsDashboard {
     }
 
     async fetchMetrics() {
-        if (!this.token) {
-            this.showError('No authentication token provided');
+        if (!this.isAuthenticated || !this.sessionToken) {
+            console.log('Not authenticated, skipping metrics fetch');
             return;
         }
 
         try {
-            const response = await fetch(`/api/metrics?token=${encodeURIComponent(this.token)}`);
+            const response = await fetch('/api/metrics', {
+                headers: {
+                    'X-Session-Token': this.sessionToken
+                }
+            });
             
             if (!response.ok) {
+                if (response.status === 401) {
+                    // Session expired, logout
+                    this.logout();
+                    return;
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
@@ -534,6 +1211,11 @@ class MetricsDashboard {
     }
 
     startMetricsPolling() {
+        if (!this.isAuthenticated || !this.sessionToken) {
+            console.log('Not authenticated, skipping metrics polling');
+            return;
+        }
+        
         this.stopMetricsPolling(); // Clear any existing interval
         this.fetchMetrics(); // Initial fetch
         this.pollingInterval = setInterval(() => {
@@ -678,6 +1360,9 @@ class MetricsDashboard {
     updateEntityBreakdown(data) {
         const entityBreakdownElement = document.getElementById('entity-breakdown');
         if (!entityBreakdownElement) return;
+
+        // Store the latest data for teleport functionality
+        this.latestData = data;
 
         if (data.entity_counts_summary && typeof data.entity_counts_summary === 'object') {
             const summary = data.entity_counts_summary;
@@ -872,6 +1557,11 @@ class MetricsDashboard {
 
     // HTTP polling for console output (WebSocket alternative)
     startConsolePolling() {
+        if (!this.isAuthenticated || !this.sessionToken) {
+            console.log('Not authenticated, skipping console polling');
+            return;
+        }
+        
         this.consolePollingInterval = setInterval(() => {
             this.fetchConsoleOutput();
         }, 2000); // Poll every 2 seconds
@@ -888,15 +1578,26 @@ class MetricsDashboard {
     }
 
     async fetchConsoleOutput() {
-        if (!this.token) return;
+        if (!this.isAuthenticated || !this.sessionToken) {
+            console.log('Not authenticated, skipping console fetch');
+            return;
+        }
 
         try {
-            const response = await fetch(`/api/console/history?token=${encodeURIComponent(this.token)}`);
+            const response = await fetch('/api/console/history', {
+                headers: {
+                    'X-Session-Token': this.sessionToken
+                }
+            });
             
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Silently handle authentication failure
-                    this.stopConsolePolling();
+                    // Session expired, logout
+                    this.logout();
+                    return;
+                } else if (response.status === 403) {
+                    // Not OP, hide console
+                    this.hideConsoleForNonOp();
                     return;
                 }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1020,10 +1721,11 @@ class MetricsDashboard {
 
     async executeServerCommand(command) {
         try {
-            const response = await fetch(`/api/console?token=${encodeURIComponent(this.token)}`, {
+            const response = await fetch('/api/console', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Session-Token': this.sessionToken
                 },
                 body: JSON.stringify({ command: command })
             });
@@ -1312,18 +2014,29 @@ class MetricsDashboard {
         } else {
             modalContent.innerHTML = `
                 <div class="entity-locations-list">
-                    ${locations.map(location => `
+                    ${locations.map((location, index) => `
                         <div class="location-item">
-                            <div class="location-coords">
-                                <span class="coord-label">X:</span> <span class="coord-value">${location.x}</span>
-                                <span class="coord-label">Y:</span> <span class="coord-value">${location.y}</span>
-                                <span class="coord-label">Z:</span> <span class="coord-value">${location.z}</span>
+                            <div class="location-info">
+                                <div class="location-coords">
+                                    <span class="coord-label">X:</span> <span class="coord-value">${location.x}</span>
+                                    <span class="coord-label">Y:</span> <span class="coord-value">${location.y}</span>
+                                    <span class="coord-label">Z:</span> <span class="coord-value">${location.z}</span>
+                                </div>
+                                <div class="location-world">${this.formatWorldName(location.world)}</div>
                             </div>
-                            <div class="location-world">${this.formatWorldName(location.world)}</div>
+                            ${this.userInfo && this.userInfo.isAdmin ? `
+                                <button class="teleport-btn" data-location-index="${index}" data-location='${JSON.stringify(location)}'>
+                                    <span class="teleport-icon">⚡</span>
+                                    Teleport
+                                </button>
+                            ` : ''}
                         </div>
                     `).join('')}
                 </div>
             `;
+
+            // Add click handlers for teleport buttons
+            this.addTeleportClickHandlers();
         }
 
         // Show modal
@@ -1390,6 +2103,196 @@ class MetricsDashboard {
         
         return worldNames[worldName] || worldName.replace('minecraft:', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
+
+    addTeleportClickHandlers() {
+        const teleportButtons = document.querySelectorAll('.teleport-btn');
+        teleportButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const locationData = JSON.parse(button.getAttribute('data-location'));
+                this.showPlayerSelectionModal(locationData);
+            });
+        });
+    }
+
+    showPlayerSelectionModal(locationData) {
+        // Create player selection modal if it doesn't exist
+        let playerModal = document.getElementById('player-selection-modal');
+        if (!playerModal) {
+            playerModal = this.createPlayerSelectionModal();
+            document.body.appendChild(playerModal);
+        }
+
+        // Get current players from the latest metrics data
+        const currentData = this.latestData;
+        const players = currentData && currentData.players ? currentData.players : [];
+
+        // Update modal content
+        const modalTitle = playerModal.querySelector('.player-modal-title');
+        const playerList = playerModal.querySelector('.player-list');
+        
+        modalTitle.textContent = `Select Player to Teleport to ${locationData.x}, ${locationData.y}, ${locationData.z}`;
+        
+        if (players.length === 0) {
+            playerList.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">👥</div>
+                    <div>No players online</div>
+                </div>
+            `;
+        } else {
+            playerList.innerHTML = `
+                ${players.map(player => `
+                    <div class="player-item" data-player-name="${player.name}">
+                        <div class="player-info">
+                            <div class="player-name">${player.name}</div>
+                            <div class="player-ping">Ping: ${player.ping}ms</div>
+                        </div>
+                        <button class="select-player-btn" data-player-name="${player.name}">
+                            Select
+                        </button>
+                    </div>
+                `).join('')}
+            `;
+
+            // Add click handlers for player selection
+            this.addPlayerSelectionHandlers(locationData);
+        }
+
+        // Show modal
+        playerModal.style.display = 'flex';
+    }
+
+    createPlayerSelectionModal() {
+        const modal = document.createElement('div');
+        modal.id = 'player-selection-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-backdrop"></div>
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 class="player-modal-title">Select Player</h3>
+                    <button class="modal-close" type="button">&times;</button>
+                </div>
+                <div class="modal-content">
+                    <div class="player-list">
+                        <!-- Player list will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        modal.querySelector('.modal-close').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        modal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            }
+        });
+
+        return modal;
+    }
+
+    addPlayerSelectionHandlers(locationData) {
+        const selectButtons = document.querySelectorAll('.select-player-btn');
+        selectButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const playerName = button.getAttribute('data-player-name');
+                this.teleportPlayer(playerName, locationData);
+            });
+        });
+    }
+
+    async teleportPlayer(playerName, locationData) {
+        try {
+            // Show loading state
+            const button = document.querySelector(`[data-player-name="${playerName}"]`);
+            const originalText = button.textContent;
+            button.textContent = 'Teleporting...';
+            button.disabled = true;
+
+            const response = await fetch('/api/teleport', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': this.sessionToken
+                },
+                body: JSON.stringify({
+                    player: playerName,
+                    x: locationData.x,
+                    y: locationData.y,
+                    z: locationData.z,
+                    world: locationData.world
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Show success message
+                button.textContent = 'Success!';
+                button.style.background = 'var(--success-color, #10b981)';
+                
+                // Close the player selection modal
+                const playerModal = document.getElementById('player-selection-modal');
+                if (playerModal) {
+                    playerModal.style.display = 'none';
+                }
+
+                // Show success notification
+                this.showNotification(`Successfully teleported ${playerName} to ${locationData.x}, ${locationData.y}, ${locationData.z}`, 'success');
+            } else {
+                // Show error message
+                button.textContent = 'Failed';
+                button.style.background = 'var(--error-color, #ef4444)';
+                this.showNotification(`Failed to teleport ${playerName}: ${result.error}`, 'error');
+            }
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '';
+            }, 2000);
+
+        } catch (error) {
+            console.error('Teleport error:', error);
+            this.showNotification(`Error teleporting ${playerName}: ${error.message}`, 'error');
+            
+            // Reset button
+            const button = document.querySelector(`[data-player-name="${playerName}"]`);
+            button.textContent = 'Select';
+            button.disabled = false;
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Show notification
+        setTimeout(() => notification.classList.add('show'), 100);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => document.body.removeChild(notification), 300);
+        }, 5000);
+    }
 }
 
 // Global function for toggling mod sections
@@ -1412,6 +2315,7 @@ function toggleModSection(sectionId) {
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Only create dashboard instance, don't start any API calls yet
     window.dashboard = new MetricsDashboard();
 });
 

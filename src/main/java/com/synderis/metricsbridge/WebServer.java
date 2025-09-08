@@ -21,6 +21,8 @@ public class WebServer {
     // private final CopyOnWriteArrayList<WsConnectContext> clients = new CopyOnWriteArrayList<>(); // Temporarily disabled
     private final CopyOnWriteArrayList<String> consoleOutput = new CopyOnWriteArrayList<>();
     private final int maxConsoleLines = 1000;
+    private PlayerAuthFilter playerAuth;
+    private UserDatabase userDatabase;
 
     public WebServer(int port, String token, Supplier<Map<String, Object>> metricsSupplier, Supplier<MinecraftServer> serverSupplier) {
         this.port = port; this.token = token; this.metricsSupplier = metricsSupplier; this.serverSupplier = serverSupplier;
@@ -39,11 +41,25 @@ public class WebServer {
             });
         }).start(port);
 
+        // Initialize user database
+        userDatabase = new UserDatabase("config/users.json");
+        
         // Auth middleware
-        AuthFilter auth = new AuthFilter(token);
-        app.before("/api/*", auth);
+        playerAuth = new PlayerAuthFilter(token, serverSupplier, userDatabase);
+        app.before("/api/*", playerAuth);
 
-        app.get("/api/metrics", ctx -> ctx.json(metricsSupplier.get()));
+        // Metrics endpoint (Authenticated users only)
+        app.get("/api/metrics", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || playerAuth.getSession(sessionToken) == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Authentication required");
+                ctx.status(401).json(response);
+                return;
+            }
+            ctx.json(metricsSupplier.get());
+        });
         
         // Test endpoint to verify server is working
         app.get("/api/test", ctx -> {
@@ -54,18 +70,227 @@ public class WebServer {
             ctx.json(response);
         });
         
-        // Fallback console endpoint (HTTP polling instead of WebSocket)
+
+        // Teleport endpoint (Admin only)
+        app.post("/api/teleport", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin privileges required");
+                ctx.status(403).json(response);
+                return;
+            }
+            
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> request = objectMapper.readValue(ctx.body(), Map.class);
+                String playerName = (String) request.get("player");
+                Double x = ((Number) request.get("x")).doubleValue();
+                Double y = ((Number) request.get("y")).doubleValue();
+                Double z = ((Number) request.get("z")).doubleValue();
+                String world = (String) request.get("world");
+                
+                if (playerName == null || playerName.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "No player name provided");
+                    ctx.json(response);
+                    return;
+                }
+
+                if (x == null || y == null || z == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Invalid coordinates provided");
+                    ctx.json(response);
+                    return;
+                }
+
+                MinecraftServer server = serverSupplier.get();
+                if (server == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Server not available");
+                    ctx.json(response);
+                    return;
+                }
+
+                // Find the player
+                var player = server.getPlayerManager().getPlayer(playerName);
+                if (player == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Player not found: " + playerName);
+                    ctx.json(response);
+                    return;
+                }
+
+                // Find the target world by checking all available worlds
+                net.minecraft.server.world.ServerWorld targetWorld = null;
+                for (net.minecraft.server.world.ServerWorld serverWorld : server.getWorlds()) {
+                    if (serverWorld.getRegistryKey().getValue().toString().equals(world)) {
+                        targetWorld = serverWorld;
+                        break;
+                    }
+                }
+                
+                if (targetWorld == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "World not found: " + world);
+                    ctx.json(response);
+                    return;
+                }
+
+                // Execute teleport command
+                String teleportCommand = String.format("tp %s %f %f %f", playerName, x, y, z);
+                ServerCommandSource source = server.getCommandSource();
+                int result = server.getCommandManager().getDispatcher().execute(teleportCommand, source.withSilent());
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", result > 0);
+                response.put("output", result > 0 ? 
+                    String.format("Teleported %s to %.2f, %.2f, %.2f in %s", playerName, x, y, z, world) : 
+                    "Teleport command failed");
+                response.put("result", result);
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Error executing teleport: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        // Login endpoint (no auth required)
+        app.post("/api/login", ctx -> {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, String> request = objectMapper.readValue(ctx.body(), Map.class);
+                String username = request.get("username");
+                String password = request.get("password");
+                
+                if (username == null || username.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Username is required");
+                    ctx.json(response);
+                    return;
+                }
+                
+                if (password == null || password.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Password is required");
+                    ctx.json(response);
+                    return;
+                }
+
+                String sessionToken = playerAuth.createSession(username, password);
+                if (sessionToken == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Invalid username or password");
+                    ctx.json(response);
+                    return;
+                }
+
+                PlayerAuthFilter.SessionInfo session = playerAuth.getSession(sessionToken);
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("sessionToken", sessionToken);
+                response.put("username", session.username);
+                response.put("displayName", session.displayName);
+                response.put("isAdmin", session.isOp);
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Login error: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        // Logout endpoint
+        app.post("/api/logout", ctx -> {
+            try {
+                String sessionToken = ctx.header("X-Session-Token");
+                if (sessionToken != null) {
+                    playerAuth.invalidateSession(sessionToken);
+                }
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Logged out successfully");
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Logout error: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        // Session info endpoint
+        app.get("/api/session", ctx -> {
+            try {
+                String sessionToken = ctx.header("X-Session-Token");
+                if (sessionToken == null || playerAuth.getSession(sessionToken) == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("authenticated", false);
+                    ctx.json(response);
+                    return;
+                }
+
+                PlayerAuthFilter.SessionInfo session = playerAuth.getSession(sessionToken);
+                Map<String, Object> response = new HashMap<>();
+                response.put("authenticated", true);
+                response.put("username", session.username);
+                response.put("displayName", session.displayName);
+                response.put("isAdmin", session.isOp);
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("authenticated", false);
+                response.put("error", "Session error: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+
+        // Console endpoints (Admin only)
         app.get("/api/console/history", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "OP privileges required for console access");
+                ctx.status(403).json(response);
+                return;
+            }
+
             Map<String, Object> response = new HashMap<>();
             response.put("console_output", new java.util.ArrayList<>(consoleOutput));
             response.put("timestamp", System.currentTimeMillis());
             response.put("total_lines", consoleOutput.size());
             ctx.json(response);
         });
-        
 
-        // Console endpoint
         app.post("/api/console", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "OP privileges required for console access");
+                ctx.status(403).json(response);
+                return;
+            }
+
             try {
                 @SuppressWarnings("unchecked")
                 Map<String, String> request = objectMapper.readValue(ctx.body(), Map.class);
@@ -102,6 +327,268 @@ public class WebServer {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("error", "Error executing command: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        // Change password endpoint
+        app.post("/api/change-password", ctx -> {
+            try {
+                String sessionToken = ctx.header("X-Session-Token");
+                if (sessionToken == null || playerAuth.getSession(sessionToken) == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Authentication required");
+                    ctx.status(401).json(response);
+                    return;
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, String> request = objectMapper.readValue(ctx.body(), Map.class);
+                String oldPassword = request.get("oldPassword");
+                String newPassword = request.get("newPassword");
+                String confirmPassword = request.get("confirmPassword");
+                
+                PlayerAuthFilter.SessionInfo session = playerAuth.getSession(sessionToken);
+                
+                if (oldPassword == null || newPassword == null || confirmPassword == null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "All password fields are required");
+                    ctx.json(response);
+                    return;
+                }
+                
+                if (!newPassword.equals(confirmPassword)) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "New passwords do not match");
+                    ctx.json(response);
+                    return;
+                }
+                
+                if (newPassword.length() < 6) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "New password must be at least 6 characters long");
+                    ctx.json(response);
+                    return;
+                }
+
+                boolean success = userDatabase.updatePassword(session.username, oldPassword, newPassword);
+                Map<String, Object> response = new HashMap<>();
+                if (success) {
+                    response.put("success", true);
+                    response.put("message", "Password changed successfully");
+                } else {
+                    response.put("success", false);
+                    response.put("error", "Invalid old password");
+                }
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Password change error: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        // Admin user management endpoints
+        app.get("/api/admin/users", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin privileges required");
+                ctx.status(403).json(response);
+                return;
+            }
+
+            Map<String, UserDatabase.UserInfo> users = userDatabase.listUsers();
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("users", users);
+            ctx.json(response);
+        });
+
+        app.post("/api/admin/users", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin privileges required");
+                ctx.status(403).json(response);
+                return;
+            }
+
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> request = objectMapper.readValue(ctx.body(), Map.class);
+                String username = (String) request.get("username");
+                String password = (String) request.get("password");
+                boolean isAdmin = false;
+                Object isAdminObj = request.get("isAdmin");
+                if (isAdminObj instanceof Boolean) {
+                    isAdmin = (Boolean) isAdminObj;
+                } else if (isAdminObj instanceof String) {
+                    isAdmin = Boolean.parseBoolean((String) isAdminObj);
+                }
+                
+                if (username == null || username.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Username is required");
+                    ctx.json(response);
+                    return;
+                }
+                
+                if (password == null || password.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Password is required");
+                    ctx.json(response);
+                    return;
+                }
+
+                boolean success = userDatabase.createUser(username, password, isAdmin);
+                Map<String, Object> response = new HashMap<>();
+                if (success) {
+                    response.put("success", true);
+                    response.put("message", "User created successfully");
+                } else {
+                    response.put("success", false);
+                    response.put("error", "Username already exists");
+                }
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "User creation error: " + e.getMessage());
+                ctx.json(response);
+            }
+        });
+
+        app.delete("/api/admin/users/{username}", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin privileges required");
+                ctx.status(403).json(response);
+                return;
+            }
+
+            String username = ctx.pathParam("username");
+            PlayerAuthFilter.SessionInfo session = playerAuth.getSession(sessionToken);
+            
+            // Prevent admin from deleting themselves
+            if (username.trim().toLowerCase().equals(session.username.trim().toLowerCase())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Cannot delete your own account");
+                ctx.json(response);
+                return;
+            }
+            
+            // Prevent deleting the original admin account
+            if (userDatabase.isOriginalAdmin(username)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Cannot delete the original admin account");
+                ctx.json(response);
+                return;
+            }
+
+            boolean success = userDatabase.deleteUser(username);
+            Map<String, Object> response = new HashMap<>();
+            if (success) {
+                response.put("success", true);
+                response.put("message", "User deleted successfully");
+            } else {
+                response.put("success", false);
+                response.put("error", "User not found");
+            }
+            ctx.json(response);
+        });
+
+        // Toggle admin status endpoint
+        app.put("/api/admin/users/{username}/admin", ctx -> {
+            String sessionToken = ctx.header("X-Session-Token");
+            if (sessionToken == null || !playerAuth.isOp(sessionToken)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin privileges required");
+                ctx.status(403).json(response);
+                return;
+            }
+
+            String username = ctx.pathParam("username");
+            PlayerAuthFilter.SessionInfo session = playerAuth.getSession(sessionToken);
+            
+            // Prevent admin from changing their own admin status
+            if (username.trim().toLowerCase().equals(session.username.trim().toLowerCase())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Cannot change your own admin status");
+                ctx.json(response);
+                return;
+            }
+
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> request = objectMapper.readValue(ctx.body(), Map.class);
+                Object isAdminObj = request.get("isAdmin");
+                boolean isAdmin = false;
+                if (isAdminObj instanceof Boolean) {
+                    isAdmin = (Boolean) isAdminObj;
+                } else if (isAdminObj instanceof String) {
+                    isAdmin = Boolean.parseBoolean((String) isAdminObj);
+                }
+
+                // Security check: Prevent removing admin privileges from the original admin
+                if (!isAdmin && userDatabase.isOriginalAdmin(username)) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("error", "Cannot remove admin privileges from the original admin account");
+                    ctx.json(response);
+                    return;
+                }
+
+                // Security check: Prevent removing admin privileges if it would leave no admins
+                if (!isAdmin) {
+                    Map<String, UserDatabase.UserInfo> allUsers = userDatabase.listUsers();
+                    long adminCount = allUsers.values().stream()
+                        .filter(user -> user.isAdmin)
+                        .count();
+                    
+                    // If this user is currently an admin and removing their admin status would leave no admins
+                    UserDatabase.UserInfo targetUser = allUsers.get(username.toLowerCase());
+                    if (targetUser != null && targetUser.isAdmin && adminCount <= 1) {
+                        Map<String, Object> response = new HashMap<>();
+                        response.put("success", false);
+                        response.put("error", "Cannot remove admin privileges: at least one admin must remain");
+                        ctx.json(response);
+                        return;
+                    }
+                }
+
+                boolean success = userDatabase.updateUserAdminStatus(username, isAdmin);
+                Map<String, Object> response = new HashMap<>();
+                if (success) {
+                    response.put("success", true);
+                    response.put("message", "Admin status updated successfully");
+                } else {
+                    response.put("success", false);
+                    response.put("error", "User not found");
+                }
+                ctx.json(response);
+                
+            } catch (Exception e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("error", "Admin status update error: " + e.getMessage());
                 ctx.json(response);
             }
         });
