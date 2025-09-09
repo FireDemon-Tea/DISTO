@@ -40,6 +40,7 @@
             <button class="tab" data-tab="entities">Entities</button>
             <button class="tab" data-tab="mods">Mods</button>
             <button class="tab" data-tab="console">Console</button>
+            <button class="tab" data-tab="map">Map</button>
             <button class="tab admin-tab" data-tab="admin" style="display: none;">Admin</button>
         </div>
 
@@ -287,6 +288,95 @@
                         <div class="console-input-container">
                             <input type="text" id="console-input" class="console-input" placeholder="Enter server command...">
                             <button id="console-send" class="btn btn-primary">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Tab -->
+        <div id="map" class="tab-content">
+            <div class="map-container">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Server Map</div>
+                            <div class="card-subtitle">Interactive 3D world map powered by BlueMap</div>
+                        </div>
+                        <div class="map-controls">
+                            <button id="refresh-map" class="btn btn-secondary">
+                                <span class="btn-icon">🔄</span>
+                                Refresh
+                            </button>
+                            <button id="fullscreen-map" class="btn btn-primary">
+                                <span class="btn-icon">⛶</span>
+                                Fullscreen
+                            </button>
+                        </div>
+                    </div>
+                    <div class="map-content">
+                        <div id="map-loading" class="map-loading">
+                            <div class="loading-spinner"></div>
+                            <div class="loading-text">Loading BlueMap...</div>
+                        </div>
+                        <iframe 
+                            id="bluemap-iframe" 
+                            src="" 
+                            class="bluemap-iframe"
+                            title="BlueMap - Server World Map"
+                            allowfullscreen>
+                        </iframe>
+                        <div id="map-error" class="map-error" style="display: none;">
+                            <div class="error-icon">🗺️</div>
+                            <div class="error-title">Map Unavailable</div>
+                            <div class="error-message">
+                                BlueMap is not configured or not running. Please check your BlueMap installation and configuration.
+                            </div>
+                            <div class="error-actions">
+                                <button id="retry-map" class="btn btn-primary">Retry</button>
+                                <button id="configure-map" class="btn btn-secondary">Configure</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Map Configuration Panel -->
+                <div class="card map-config-panel" style="display: none;">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Map Configuration</div>
+                            <div class="card-subtitle">Configure BlueMap integration settings</div>
+                        </div>
+                    </div>
+                    <div class="map-config-content">
+                        <div class="form-group">
+                            <label for="bluemap-url" class="form-label">BlueMap URL</label>
+                            <input 
+                                type="url" 
+                                id="bluemap-url" 
+                                class="form-input" 
+                                placeholder="http://localhost:8100"
+                                value="http://localhost:8100">
+                            <div class="form-help">
+                                Enter the URL where BlueMap is running (usually http://localhost:8100)
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="map-world" class="form-label">Default World</label>
+                            <select id="map-world" class="form-input">
+                                <option value="">Auto-detect</option>
+                                <option value="overworld">Overworld</option>
+                                <option value="the_nether">The Nether</option>
+                                <option value="the_end">The End</option>
+                            </select>
+                            <div class="form-help">
+                                Select the default world to display when opening the map
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="save-map-config" class="btn btn-primary">Save Configuration</button>
+                            <button id="test-map-connection" class="btn btn-secondary">Test Connection</button>
+                            <button id="cancel-map-config" class="btn btn-secondary">Cancel</button>
                         </div>
                     </div>
                 </div>
