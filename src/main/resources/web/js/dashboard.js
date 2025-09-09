@@ -235,11 +235,13 @@ class MetricsDashboard {
         // Check console access based on admin status
         this.checkConsoleAccess();
         
-        // Add logout functionality
-        this.addLogoutButton();
+        // Logout functionality now handled by profile popup
         
         // Initialize admin portal if user is admin
         this.initializeAdminPortal();
+        
+        // Initialize profile popup
+        this.initializeProfilePopup();
         
         // Initialize BlueMap integration
         this.initializeBlueMap();
@@ -278,21 +280,6 @@ class MetricsDashboard {
         console.log('Dashboard HTML loading complete');
     }
 
-    addLogoutButton() {
-        // Add logout button to the header
-        const header = document.querySelector('.header');
-        if (header && this.userInfo) {
-            const userInfo = document.createElement('div');
-            userInfo.className = 'user-info';
-            userInfo.innerHTML = `
-                <span class="user-name">${this.userInfo.displayName}</span>
-                ${this.userInfo.isAdmin ? '<span class="op-badge">Admin</span>' : ''}
-                <button class="btn btn-secondary btn-small" onclick="dashboard.showChangePasswordModal()">Change Password</button>
-                <button class="logout-btn" onclick="dashboard.logout()">Logout</button>
-            `;
-            header.appendChild(userInfo);
-        }
-    }
 
     async logout() {
         try {
@@ -961,6 +948,76 @@ class MetricsDashboard {
                 errorElement.remove();
             }
         }, 5000);
+    }
+    
+    initializeProfilePopup() {
+        const profileButton = document.getElementById('profile-button');
+        const profilePopup = document.getElementById('profile-popup');
+        const changePasswordMenu = document.getElementById('change-password-menu');
+        const dashboardSettingsMenu = document.getElementById('dashboard-settings-menu');
+        const logoutMenu = document.getElementById('logout-menu');
+        
+        if (!profileButton || !profilePopup) return;
+        
+        // Toggle popup on button click
+        profileButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = profilePopup.classList.contains('show');
+            
+            // Close all other popups first
+            this.closeAllPopups();
+            
+            if (!isOpen) {
+                profilePopup.classList.add('show');
+                profileButton.classList.add('open');
+            }
+        });
+        
+        // Close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!profileButton.contains(e.target) && !profilePopup.contains(e.target)) {
+                this.closeProfilePopup();
+            }
+        });
+        
+        // Menu item handlers
+        if (changePasswordMenu) {
+            changePasswordMenu.addEventListener('click', () => {
+                this.closeProfilePopup();
+                this.showChangePasswordModal();
+            });
+        }
+        
+        if (dashboardSettingsMenu) {
+            dashboardSettingsMenu.addEventListener('click', () => {
+                this.closeProfilePopup();
+                this.switchToTab('settings');
+            });
+        }
+        
+        if (logoutMenu) {
+            logoutMenu.addEventListener('click', () => {
+                this.closeProfilePopup();
+                this.logout();
+            });
+        }
+    }
+    
+    closeProfilePopup() {
+        const profileButton = document.getElementById('profile-button');
+        const profilePopup = document.getElementById('profile-popup');
+        
+        if (profilePopup) {
+            profilePopup.classList.remove('show');
+        }
+        if (profileButton) {
+            profileButton.classList.remove('open');
+        }
+    }
+    
+    closeAllPopups() {
+        this.closeProfilePopup();
+        // Add other popup close methods here as needed
     }
 
     async fetchMetrics() {
