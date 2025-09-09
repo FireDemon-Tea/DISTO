@@ -151,9 +151,9 @@ public class JsonUtil {
     }
 
     public static Map<String, Object> loadConfig() {
-        Path p = Path.of("config/metricsbridge.json");
+        Path p = Path.of("config/disto.json");
         try {
-            if (!Files.exists(p)) return MAPPER.readValue(JsonUtil.class.getClassLoader().getResourceAsStream("metricsbridge-default.json"), new TypeReference<>(){});
+            if (!Files.exists(p)) return MAPPER.readValue(JsonUtil.class.getClassLoader().getResourceAsStream("disto-default.json"), new TypeReference<>(){});
             return MAPPER.readValue(Files.readString(p), new TypeReference<>(){});
         } catch (IOException e) {
             throw new RuntimeException(e);

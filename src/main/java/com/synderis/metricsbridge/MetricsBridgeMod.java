@@ -52,9 +52,9 @@ public class MetricsBridgeMod implements ModInitializer {
         try {
             Path cfgDir = Paths.get("config");
             if (!Files.exists(cfgDir)) Files.createDirectories(cfgDir);
-            Path target = cfgDir.resolve("metricsbridge.json");
+            Path target = cfgDir.resolve("disto.json");
             if (!Files.exists(target)) {
-                try (InputStream in = getClass().getClassLoader().getResourceAsStream("metricsbridge-default.json")) {
+                try (InputStream in = getClass().getClassLoader().getResourceAsStream("disto-default.json")) {
                     Files.copy(in, target);
                 }
             }
