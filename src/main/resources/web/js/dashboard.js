@@ -343,10 +343,10 @@ class MetricsDashboard {
     }
 
     hideAdminForNonAdmin() {
-        // Hide admin tab for non-admin users
-        const adminTab = document.querySelector('[data-tab="admin"]');
-        if (adminTab) {
-            adminTab.style.display = 'none';
+        // Hide admin category for non-admin users
+        const adminCategory = document.querySelector('.admin-category');
+        if (adminCategory) {
+            adminCategory.style.display = 'none';
         }
     }
 
@@ -356,10 +356,10 @@ class MetricsDashboard {
             return;
         }
 
-        // Show admin tab
-        const adminTab = document.querySelector('[data-tab="admin"]');
-        if (adminTab) {
-            adminTab.style.display = 'block';
+        // Show admin category
+        const adminCategory = document.querySelector('.admin-category');
+        if (adminCategory) {
+            adminCategory.style.display = 'block';
         }
 
         // Setup admin event listeners
@@ -733,29 +733,38 @@ class MetricsDashboard {
     }
 
     setupTabs() {
-        const tabs = document.querySelectorAll('.tab');
-        const tabContents = document.querySelectorAll('.tab-content');
+        // Setup sidebar navigation
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const categoryHeaders = document.querySelectorAll('.category-header');
 
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const targetTab = tab.getAttribute('data-tab');
+        // Handle sidebar item clicks
+        sidebarItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const targetTab = item.getAttribute('data-tab');
                 this.switchToTab(targetTab);
+            });
+        });
+
+        // Handle category header clicks (collapse/expand)
+        categoryHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                header.classList.toggle('collapsed');
             });
         });
     }
 
     switchToTab(targetTab) {
-        const tabs = document.querySelectorAll('.tab');
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
         const tabContents = document.querySelectorAll('.tab-content');
         
-        // Remove active class from all tabs and contents
-        tabs.forEach(t => t.classList.remove('active'));
+        // Remove active class from all sidebar items and contents
+        sidebarItems.forEach(item => item.classList.remove('active'));
         tabContents.forEach(content => content.classList.remove('active'));
         
-        // Add active class to target tab and corresponding content
-        const targetTabElement = document.querySelector(`[data-tab="${targetTab}"]`);
-        if (targetTabElement) {
-            targetTabElement.classList.add('active');
+        // Add active class to target sidebar item and corresponding content
+        const targetSidebarItem = document.querySelector(`[data-tab="${targetTab}"]`);
+        if (targetSidebarItem) {
+            targetSidebarItem.classList.add('active');
         }
         
         const targetContent = document.getElementById(targetTab);
@@ -829,6 +838,15 @@ class MetricsDashboard {
     }
 
     setupSettingsListeners() {
+        // Settings form submission
+        const settingsForm = document.getElementById('settings-form');
+        if (settingsForm) {
+            settingsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveSettings();
+            });
+        }
+
         // Save settings button
         const saveBtn = document.getElementById('save-settings');
         if (saveBtn) {
@@ -836,47 +854,62 @@ class MetricsDashboard {
         }
 
         // Reset settings button
-        const resetBtn = document.getElementById('reset-settings');
+        const resetBtn = document.getElementById('reset-settings-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => this.resetSettings());
         }
+        
     }
 
     loadSettings() {
-        const serverName = localStorage.getItem('server_name') || 'Minecraft Server Dashboard';
-        const serverNameInput = document.getElementById('server-name');
-        if (serverNameInput) {
-            serverNameInput.value = serverName;
+        // Load dashboard title
+        const dashboardTitle = localStorage.getItem('dashboard_title') || 'DISTO Dashboard';
+        const dashboardTitleInput = document.getElementById('dashboard-title');
+        if (dashboardTitleInput) {
+            dashboardTitleInput.value = dashboardTitle;
         }
-        this.updateServerName(serverName);
+        
+        // Update the dashboard title
+        this.updateDashboardTitle(dashboardTitle);
     }
 
     saveSettings() {
-        const serverNameInput = document.getElementById('server-name');
-        if (serverNameInput) {
-            const serverName = serverNameInput.value.trim() || 'Minecraft Server Dashboard';
-            localStorage.setItem('server_name', serverName);
-            this.updateServerName(serverName);
-            this.showSuccessMessage('Settings saved successfully!');
+        // Save dashboard title
+        const dashboardTitleInput = document.getElementById('dashboard-title');
+        if (dashboardTitleInput) {
+            const dashboardTitle = dashboardTitleInput.value.trim() || 'DISTO Dashboard';
+            localStorage.setItem('dashboard_title', dashboardTitle);
+            this.updateDashboardTitle(dashboardTitle);
         }
+        
+        this.showSuccessMessage('Settings saved successfully!');
     }
 
     resetSettings() {
-        const serverNameInput = document.getElementById('server-name');
-        if (serverNameInput) {
-            serverNameInput.value = 'Minecraft Server Dashboard';
-            localStorage.setItem('server_name', 'Minecraft Server Dashboard');
-            this.updateServerName('Minecraft Server Dashboard');
-            this.showSuccessMessage('Settings reset to default!');
+        // Reset dashboard title
+        const dashboardTitleInput = document.getElementById('dashboard-title');
+        if (dashboardTitleInput) {
+            dashboardTitleInput.value = 'DISTO Dashboard';
+            localStorage.setItem('dashboard_title', 'DISTO Dashboard');
+            this.updateDashboardTitle('DISTO Dashboard');
         }
+        
+        this.showSuccessMessage('Settings reset to default!');
     }
 
-    updateServerName(name) {
+    updateDashboardTitle(title) {
         const logoText = document.querySelector('.logo-text');
         if (logoText) {
-            logoText.textContent = name;
+            logoText.textContent = title;
         }
+        document.title = title;
     }
+    
+    updateServerName(name) {
+        // This method is kept for backward compatibility
+        this.updateDashboardTitle(name);
+    }
+    
 
     showSuccessMessage(message) {
         // Create or update success message
@@ -902,6 +935,32 @@ class MetricsDashboard {
                 successElement.remove();
             }
         }, 3000);
+    }
+    
+    showErrorMessage(message) {
+        // Create or update error message
+        let errorElement = document.getElementById('error-message');
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = 'error-message';
+            errorElement.className = 'error-state';
+            document.body.insertBefore(errorElement, document.body.firstChild);
+        }
+        
+        errorElement.innerHTML = `
+            <div class="error-icon">❌</div>
+            <div>${message}</div>
+            <button onclick="this.parentElement.remove()" class="btn btn-danger" style="margin-top: 1rem;">
+                Dismiss
+            </button>
+        `;
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (errorElement && errorElement.parentElement) {
+                errorElement.remove();
+            }
+        }, 5000);
     }
 
     async fetchMetrics() {
