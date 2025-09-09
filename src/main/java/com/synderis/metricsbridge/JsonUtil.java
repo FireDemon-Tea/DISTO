@@ -347,6 +347,10 @@ public class JsonUtil {
                 return bluemapInfo;
             }
             
+            // For BlueMap detection, we'll let the client handle the IP detection
+            // since the server can't reliably determine its external IP
+            bluemapInfo.put("server_ip_detection", "client_side");
+            
             // Try to detect BlueMap configuration files
             Path bluemapConfigPath = Path.of("config/bluemap/bluemap.conf");
             Path bluemapWebConfigPath = Path.of("config/bluemap/webserver.conf");
@@ -381,58 +385,17 @@ public class JsonUtil {
             }
             bluemapInfo.put("configured_port", configuredPort);
             
-            String detectedPort = null;
-            String detectedUrl = null;
-            
-            // First, try the configured port if it exists
+            // Return the configured port and let the client test it
             if (configuredPort != null) {
-                try {
-                    int port = Integer.parseInt(configuredPort);
-                    
-                    if (isPortOpen("localhost", port)) {
-                        if (isBlueMapRunning(port)) {
-                            detectedPort = String.valueOf(port);
-                            detectedUrl = "http://localhost:" + port;
-                        }
-                    }
-                } catch (NumberFormatException e) {
-                    // Invalid port number, ignore
-                }
-            }
-            
-            // If configured port didn't work, try common BlueMap ports
-            if (detectedUrl == null) {
-                int[] commonPorts = {8100, 8101, 8102, 8080, 8081, 3000, 3001};
-                
-                for (int port : commonPorts) {
-                    if (isPortOpen("localhost", port)) {
-                        if (isBlueMapRunning(port)) {
-                            detectedPort = String.valueOf(port);
-                            detectedUrl = "http://localhost:" + port;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            bluemapInfo.put("detected_port", detectedPort);
-            bluemapInfo.put("detected_url", detectedUrl);
-            
-            if (detectedUrl != null) {
-                bluemapInfo.put("status", "running");
-                bluemapInfo.put("message", "BlueMap detected and running");
+                bluemapInfo.put("detected_port", configuredPort);
+                bluemapInfo.put("status", "configured");
+                bluemapInfo.put("message", "BlueMap mod is installed and configured on port " + configuredPort + ". Client will test connectivity.");
+            } else if (configExists || webConfigExists) {
+                bluemapInfo.put("status", "configured_no_port");
+                bluemapInfo.put("message", "BlueMap mod is installed and configured but no port found in config.");
             } else {
-                // Provide more specific error messages
-                if (configuredPort != null) {
-                    bluemapInfo.put("status", "not_running");
-                    bluemapInfo.put("message", "BlueMap mod is installed but not running on configured port " + configuredPort + ". Please start BlueMap or check the configuration.");
-                } else if (configExists || webConfigExists) {
-                    bluemapInfo.put("status", "not_running");
-                    bluemapInfo.put("message", "BlueMap mod is installed and configured but not running. Please start BlueMap.");
-                } else {
-                    bluemapInfo.put("status", "not_running");
-                    bluemapInfo.put("message", "BlueMap mod is installed but not configured or running. Please configure and start BlueMap.");
-                }
+                bluemapInfo.put("status", "not_configured");
+                bluemapInfo.put("message", "BlueMap mod is installed but not configured.");
             }
             
         } catch (Exception e) {
@@ -443,40 +406,4 @@ public class JsonUtil {
         return bluemapInfo;
     }
     
-    /**
-     * Check if a port is open
-     */
-    private static boolean isPortOpen(String host, int port) {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 1000); // 1 second timeout
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
-    }
-    
-    /**
-     * Check if BlueMap is actually running on the port by testing for BlueMap-specific endpoints
-     */
-    private static boolean isBlueMapRunning(int port) {
-        try {
-            // Try to make an HTTP request to check for BlueMap-specific endpoints
-            java.net.URI uri = java.net.URI.create("http://localhost:" + port + "/settings.json");
-            java.net.URL url = uri.toURL();
-            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(2000); // 2 second timeout
-            connection.setReadTimeout(2000);
-            
-            int responseCode = connection.getResponseCode();
-            connection.disconnect();
-            
-            // BlueMap should return 200 for settings.json if it's running properly
-            return responseCode == 200;
-            
-        } catch (Exception e) {
-            // If we can't connect or get an error, it's probably not BlueMap
-            return false;
-        }
-    }
 }

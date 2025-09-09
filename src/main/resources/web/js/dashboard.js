@@ -2388,36 +2388,73 @@ class MetricsDashboard {
             const bluemapInfo = await response.json();
             console.log('BlueMap detection result:', bluemapInfo);
             
-            if (bluemapInfo.status === 'running' && bluemapInfo.detected_url) {
-                console.log('Auto-detected BlueMap URL:', bluemapInfo.detected_url);
+            if (bluemapInfo.status === 'not_installed') {
+                console.log('BlueMap mod is not installed');
+                this.bluemapConfig.detectionInfo = bluemapInfo;
+                this.hideMapTab();
+                return;
+            }
+            
+            // Get the current host (external IP) from the browser
+            const currentHost = window.location.hostname;
+            console.log('Using host for BlueMap detection:', currentHost);
+            
+            // Test BlueMap connectivity from the client side
+            const detectedUrl = await this.testBlueMapConnectivity(currentHost, bluemapInfo);
+            
+            if (detectedUrl) {
+                console.log('Auto-detected BlueMap URL:', detectedUrl);
                 
                 // Update configuration with detected URL
-                this.bluemapConfig.url = bluemapInfo.detected_url;
+                this.bluemapConfig.url = detectedUrl;
                 this.bluemapConfig.autoDetected = true;
                 this.bluemapConfig.detectionInfo = bluemapInfo;
                 
                 // Save the auto-detected configuration
                 this.saveBlueMapConfig();
                 
-                this.showNotification(`BlueMap auto-detected at ${bluemapInfo.detected_url}`, 'success');
+                this.showNotification(`BlueMap auto-detected at ${detectedUrl}`, 'success');
                 this.showMapTab();
-            } else if (bluemapInfo.status === 'not_installed') {
-                console.log('BlueMap mod is not installed');
-                this.bluemapConfig.detectionInfo = bluemapInfo;
-                this.hideMapTab();
-            } else if (bluemapInfo.status === 'not_running') {
-                console.log('BlueMap mod is installed but not running');
-                this.bluemapConfig.detectionInfo = bluemapInfo;
-                this.showNotification('BlueMap mod is installed but not running. Please start BlueMap or configure manually.', 'warning');
-                this.hideMapTab();
             } else {
-                // Any other status means BlueMap is not available
+                console.log('BlueMap not accessible from client');
+                this.bluemapConfig.detectionInfo = bluemapInfo;
+                this.showNotification('BlueMap mod is installed but not accessible. Please check configuration.', 'warning');
                 this.hideMapTab();
             }
             
         } catch (error) {
             console.error('Error detecting BlueMap:', error);
             this.hideMapTab();
+        }
+    }
+    
+    async testBlueMapConnectivity(host, bluemapInfo) {
+        // Only test the configured port from BlueMap config
+        if (!bluemapInfo.detected_port) {
+            console.log('No BlueMap port configured');
+            return null;
+        }
+        
+        const port = parseInt(bluemapInfo.detected_port);
+        const url = `http://${host}:${port}`;
+        
+        console.log(`Testing BlueMap at configured port: ${url}`);
+        
+        try {
+            // Test if BlueMap is accessible
+            const response = await fetch(`${url}/settings.json`, {
+                method: 'HEAD',
+                mode: 'no-cors',
+                timeout: 3000
+            });
+            
+            // If we get here without an error, BlueMap is likely running
+            console.log(`BlueMap found at: ${url}`);
+            return url;
+            
+        } catch (error) {
+            console.log(`BlueMap not accessible at: ${url} - ${error.message}`);
+            return null;
         }
     }
 
@@ -2570,8 +2607,10 @@ class MetricsDashboard {
     }
 
     getDefaultBlueMapConfig() {
+        // Get the current host from the browser's location
+        const currentHost = window.location.hostname;
         return {
-            url: 'http://localhost:8100',
+            url: `http://${currentHost}:8100`,
             defaultWorld: '',
             autoRefresh: true,
             fullscreenEnabled: true
