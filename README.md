@@ -1,4 +1,6 @@
-# Fabric Metrics Bridge
+# DISTO
+
+**Dashboard for Information, Statistics, Telemetry, and Objects**
 
 A comprehensive Minecraft Fabric mod that provides a web-based dashboard for monitoring server performance, managing users, and executing admin commands. Features real-time metrics, secure authentication, and an intuitive web interface.
 
@@ -46,8 +48,8 @@ A comprehensive Minecraft Fabric mod that provides a web-based dashboard for mon
 
 ### 1. Download and Install
 
-1. Go to the [Releases](https://github.com/yourusername/fabric-metrics-bridge/releases) page
-2. Download the latest `fabric-metrics-bridge.jar` from the latest release
+1. Go to the [Releases](https://github.com/FireDemon-Tea/DISTO/releases) page
+2. Download the latest `disto.jar` from the latest release
 3. Place it in your server's `mods` folder
 4. Start your server to generate the configuration file
 
@@ -55,7 +57,7 @@ A comprehensive Minecraft Fabric mod that provides a web-based dashboard for mon
 
 ### 2. Configuration
 
-The mod will create a `config/metricsbridge.json` file on first run:
+The mod will create a `config/disto.json` file on first run:
 
 ```json
 {
@@ -215,7 +217,7 @@ The mod logs important events to the server console:
 
 ### Updating the Mod
 1. Stop your server
-2. Download the latest release from [GitHub Releases](https://github.com/yourusername/fabric-metrics-bridge/releases)
+2. Download the latest release from [GitHub Releases](https://github.com/FireDemon-Tea/DISTO/releases)
 3. Replace the old JAR file with the new version
 4. Start your server
 5. Configuration and user data will be preserved
@@ -228,7 +230,7 @@ The mod logs important events to the server console:
 
 ### Backup Recommendations
 - **User database**: Backup `config/users.json`
-- **Configuration**: Backup `config/metricsbridge.json`
+- **Configuration**: Backup `config/disto.json`
 - **Server data**: Regular server backups
 
 ## 🤝 Contributing
