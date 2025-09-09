@@ -1,8 +1,8 @@
 {
     "schemaVersion": 1,
-    "id": "metricsbridge",
+    "id": "disto",
     "version": "1.1.0",
-    "name": "Fabric Metrics Bridge",
+    "name": "DISTO",
     "description": "Exposes Fabric server performance metrics over HTTP and WebSocket (read-only).",
     "authors": ["Synderis + GPT"],
     "contact": {},
