@@ -1,0 +1,36 @@
+[Unit]
+Description=Minecraft Server with MetricsBridge Mod
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=minecraft
+Group=minecraft
+WorkingDirectory=/opt/minecraft
+ExecStart=/usr/bin/java -Xmx2G -Xms1G -jar /opt/minecraft/server.jar nogui
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=minecraft-server
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/minecraft
+ReadWritePaths=/var/log/minecraft
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=4G
+
+# Environment variables
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+Environment=MINECRAFT_OPTS=-Xmx2G -Xms1G
+
+[Install]
+WantedBy=multi-user.target
