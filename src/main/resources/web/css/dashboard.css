@@ -335,6 +335,32 @@ body {
   color: var(--text-secondary);
 }
 
+.player-location {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.125rem;
+}
+
+.player-dimension {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.125rem;
+}
+
+.player-location-link {
+  font-size: 0.75rem;
+  color: var(--primary-color);
+  margin-top: 0.125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.player-location-link:hover {
+  color: var(--primary-color-hover, #4a9eff);
+  text-decoration: none;
+}
+
 /* Tabs */
 .tabs {
   display: flex;

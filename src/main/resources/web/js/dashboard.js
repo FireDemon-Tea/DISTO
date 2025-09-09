@@ -226,6 +226,7 @@ class MetricsDashboard {
         this.setupEventListeners();
         this.setupTabs();
         this.setupConsole();
+        this.setupPlayerLocationLinks();
         this.startMetricsPolling();
         this.initializeCharts();
         this.updateConnectionStatus();
@@ -738,18 +739,49 @@ class MetricsDashboard {
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const targetTab = tab.getAttribute('data-tab');
-                
-                // Remove active class from all tabs and contents
-                tabs.forEach(t => t.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
-                
-                // Add active class to clicked tab and corresponding content
-                tab.classList.add('active');
-                const targetContent = document.getElementById(targetTab);
-                if (targetContent) {
-                    targetContent.classList.add('active');
-                }
+                this.switchToTab(targetTab);
             });
+        });
+    }
+
+    switchToTab(targetTab) {
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // Remove active class from all tabs and contents
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to target tab and corresponding content
+        const targetTabElement = document.querySelector(`[data-tab="${targetTab}"]`);
+        if (targetTabElement) {
+            targetTabElement.classList.add('active');
+        }
+        
+        const targetContent = document.getElementById(targetTab);
+        if (targetContent) {
+            targetContent.classList.add('active');
+        }
+    }
+
+    setupPlayerLocationLinks() {
+        // Use event delegation to handle clicks on player location links
+        document.addEventListener('click', (event) => {
+            console.log('Click event on:', event.target);
+            if (event.target.classList.contains('player-location-link')) {
+                console.log('Player location link clicked');
+                const playerId = event.target.getAttribute('data-player-id');
+                console.log('Player ID:', playerId);
+                console.log('Player data cache:', this.playerDataCache);
+                
+                if (playerId && this.playerDataCache && this.playerDataCache[playerId]) {
+                    const player = this.playerDataCache[playerId];
+                    console.log('Found player data:', player);
+                    this.openBlueMapForPlayer(player);
+                } else {
+                    console.error('Player data not found for ID:', playerId);
+                }
+            }
         });
     }
 
@@ -1288,7 +1320,28 @@ class MetricsDashboard {
 
         // If we have actual player data, use it
         if (data.players && Array.isArray(data.players) && data.players.length > 0) {
-            playerListElement.innerHTML = data.players.map(player => `
+            playerListElement.innerHTML = data.players.map(player => {
+                const location = player.location;
+                const locationText = location ? 
+                    `${location.x}, ${location.y}, ${location.z}` : 
+                    'Unknown';
+                const dimension = location && location.dimension ? 
+                    location.dimension.split(':')[1] || location.dimension : 
+                    'Unknown';
+                
+                const canOpenMap = location && this.bluemapConfig && this.bluemapConfig.url;
+                const playerId = `player-${player.name.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+                const locationDisplay = canOpenMap ? 
+                    `<span class="player-location-link" data-player-id="${playerId}" title="Click to view on map">Location: ${locationText} 🗺️</span>` :
+                    `<span class="player-location" title="BlueMap not configured">Location: ${locationText}</span>`;
+                
+                // Store player data for later retrieval
+                if (canOpenMap) {
+                    this.playerDataCache = this.playerDataCache || {};
+                    this.playerDataCache[playerId] = player;
+                }
+                
+                return `
                 <div class="player-item">
                     <div class="player-head">
                         <img src="https://mc-heads.net/avatar/${player.name || 'steve'}/32" 
@@ -1300,9 +1353,12 @@ class MetricsDashboard {
                     <div class="player-info">
                         <div class="player-name">${player.name || 'Unknown'}</div>
                         <div class="player-ping">Ping: ${player.ping || 0}ms</div>
+                        <div>${locationDisplay}</div>
+                        <div class="player-dimension">Dimension: ${dimension}</div>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else if (data.player_count && data.player_count > 0 && data.player_count !== "Data unavailable") {
             // If we only have player count but no actual player data, show a message
             playerListElement.innerHTML = `
@@ -2330,6 +2386,123 @@ class MetricsDashboard {
         }
     }
 
+    generateBlueMapPlayerUrl(player) {
+        if (!player.location || !this.bluemapConfig || !this.bluemapConfig.url) {
+            return null;
+        }
+
+        const { x, y, z, dimension, world_save_name } = player.location;
+        // Use the world save name from the server (dynamic based on actual server configuration)
+        const worldName = world_save_name || 'world'; // Fallback to 'world' if not provided
+        
+        console.log('Original coordinates:', { x, y, z, dimension, world_save_name });
+        console.log('Using world save name:', worldName);
+        
+        // Use more precise coordinates (round to 1 decimal place instead of integers)
+        const preciseX = Math.round(x * 10) / 10;
+        const preciseY = Math.round((y + 50) * 10) / 10; // 50 blocks above player for better aerial view
+        const preciseZ = Math.round(z * 10) / 10;
+        
+        console.log('Precise coordinates:', { x: preciseX, y: preciseY, z: preciseZ });
+        
+        // Try different coordinate formats - some systems might expect different formats
+        // Format 1: Standard Minecraft coordinates
+        const coords1 = { x: preciseX, y: preciseY, z: preciseZ };
+        // Format 2: Some systems might expect block coordinates (integers)
+        const coords2 = { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) };
+        // Format 3: Some systems might have Z inverted
+        const coords3 = { x: preciseX, y: preciseY, z: -preciseZ };
+        // Format 4: BlueMap offset correction (based on your observation: 564.3->464, 103.3->0)
+        // This suggests BlueMap might be applying an offset or using a different origin
+        const coords4 = { x: preciseX - 100.3, y: preciseY, z: preciseZ - 103.3 };
+        // Format 5: Alternative offset calculation
+        const coords5 = { x: preciseX - 100, y: preciseY, z: preciseZ - 103 };
+        
+        console.log('Coordinate format options:', { coords1, coords2, coords3, coords4, coords5 });
+        
+        // Use Format 1 (standard coordinates) since it's not an offset issue
+        const coords = coords1;
+        
+        // Add a note about which format is being used
+        console.log('Using coordinate format 1 (standard Minecraft coordinates)');
+        
+        // Generate BlueMap URL with player coordinates
+        const baseUrl = this.bluemapConfig.url;
+        
+        // BlueMap uses hash-based URL format: #world:x:y:z:distance_from_ground:zoom:rx:ry:rz:perspective
+        // Based on your example: #world:552:53:203:141:3:0:0:0:0:perspective
+        // Format: x:y:z:distance_from_ground:zoom:rx:ry:rz:perspective
+        const hashFormat = `#${worldName}:${coords.x}:${coords.y}:${coords.z}:50:0:0:0:0:perspective`;
+        
+        console.log('BlueMap hash format:', hashFormat);
+        
+        const finalUrl = `${baseUrl}${hashFormat}`;
+        console.log('Generated BlueMap URL:', finalUrl);
+        
+        return finalUrl;
+    }
+
+    openBlueMapForPlayer(player) {
+        console.log('Opening BlueMap for player:', player);
+        
+        const mapUrl = this.generateBlueMapPlayerUrl(player);
+        console.log('Generated map URL:', mapUrl);
+        
+        if (!mapUrl) {
+            this.showNotification('Unable to generate map link for player', 'error');
+            return;
+        }
+
+        // Store the player URL so it doesn't get overwritten
+        this.currentPlayerMapUrl = mapUrl;
+        this.currentPlayerName = player.name;
+
+        // Switch to map tab
+        this.switchToTab('map');
+        
+        // Update the iframe source to show the player's location
+        const iframe = document.getElementById('bluemap-iframe');
+        if (iframe) {
+            console.log('Updating iframe src to:', mapUrl);
+            iframe.src = mapUrl;
+        } else {
+            console.error('BlueMap iframe not found');
+        }
+        
+        this.showNotification(`Opening map for ${player.name}`, 'info');
+    }
+
+    // Temporary debugging function - you can call this from browser console
+    // Usage: dashboard.testCoordinateFormats(playerData)
+    testCoordinateFormats(player) {
+        console.log('Testing coordinate formats for player:', player);
+        
+        if (!player.location) {
+            console.error('No location data for player');
+            return;
+        }
+        
+        const { x, y, z, dimension } = player.location;
+        const worldName = dimension.split(':')[1] || dimension;
+        
+        const formats = [
+            { name: 'Format 1 (Standard)', x: x, y: y, z: z },
+            { name: 'Format 2 (Block coords)', x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) },
+            { name: 'Format 3 (Z inverted)', x: x, y: y, z: -z },
+            { name: 'Format 4 (BlueMap offset correction)', x: x - 100.3, y: y, z: z - 103.3 },
+            { name: 'Format 5 (Alternative offset)', x: x - 100, y: y, z: z - 103 },
+            { name: 'Format 6 (X inverted)', x: -x, y: y, z: z },
+            { name: 'Format 7 (Both X,Z inverted)', x: -x, y: y, z: -z }
+        ];
+        
+        formats.forEach((format, index) => {
+            const url = `${this.bluemapConfig.url}?world=${worldName}&x=${format.x}&y=${format.y}&z=${format.z}&zoom=3`;
+            console.log(`${format.name}: ${url}`);
+        });
+        
+        console.log('You can manually test these URLs to see which one works correctly');
+    }
+
     getDefaultBlueMapConfig() {
         return {
             url: 'http://localhost:8100',
@@ -2411,9 +2584,19 @@ class MetricsDashboard {
         iframe.classList.remove('loaded');
 
         // Build BlueMap URL
-        let mapUrl = this.bluemapConfig.url;
-        if (this.bluemapConfig.defaultWorld) {
-            mapUrl += `#${this.bluemapConfig.defaultWorld}`;
+        let mapUrl;
+        
+        // Check if we have a player-specific URL to show
+        if (this.currentPlayerMapUrl) {
+            mapUrl = this.currentPlayerMapUrl;
+            console.log('Using stored player map URL:', mapUrl);
+        } else {
+            // Use default URL
+            mapUrl = this.bluemapConfig.url;
+            if (this.bluemapConfig.defaultWorld) {
+                mapUrl += `#${this.bluemapConfig.defaultWorld}`;
+            }
+            console.log('Using default map URL:', mapUrl);
         }
 
         // Set iframe source
@@ -2447,6 +2630,9 @@ class MetricsDashboard {
 
     refreshBlueMap() {
         console.log('Refreshing BlueMap...');
+        // Clear any player-specific URL when manually refreshing
+        this.currentPlayerMapUrl = null;
+        this.currentPlayerName = null;
         this.loadBlueMap();
     }
 

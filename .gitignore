@@ -109,3 +109,6 @@ node_modules/
 run/
 logs/
 crash-reports/
+
+# Deployment scripts
+deploy-to-test-server.bat

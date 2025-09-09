@@ -50,6 +50,48 @@ public class JsonUtil {
                     Map<String, Object> playerInfo = new HashMap<>();
                     playerInfo.put("name", player.getName().getString());
                     playerInfo.put("ping", player.networkHandler.getLatency());
+                    
+                    // Add player location data
+                    Map<String, Object> locationData = new HashMap<>();
+                    locationData.put("x", Math.round(player.getX() * 100.0) / 100.0);
+                    locationData.put("y", Math.round(player.getY() * 100.0) / 100.0);
+                    locationData.put("z", Math.round(player.getZ() * 100.0) / 100.0);
+                    locationData.put("dimension", player.getWorld().getRegistryKey().getValue().toString());
+                    
+                    // Add world save name for BlueMap compatibility
+                    // Get the actual world save name from the server's world data
+                    String worldSaveName;
+                    try {
+                        // Get the world save name from the server's world data
+                        worldSaveName = player.getWorld().getServer().getSaveProperties().getLevelName();
+                        
+                        // For nether and end, append the dimension suffix
+                        String dimensionPath = player.getWorld().getRegistryKey().getValue().getPath();
+                        if (dimensionPath.equals("the_nether")) {
+                            worldSaveName += "_the_nether";
+                        } else if (dimensionPath.equals("the_end")) {
+                            worldSaveName += "_the_end";
+                        }
+                        // For overworld, use the save name as-is
+                        
+                    } catch (Exception e) {
+                        // Fallback to dimension-based naming if we can't get the save name
+                        String dimensionPath = player.getWorld().getRegistryKey().getValue().getPath();
+                        if (dimensionPath.equals("overworld")) {
+                            worldSaveName = "world";
+                        } else if (dimensionPath.equals("the_nether")) {
+                            worldSaveName = "world_the_nether";
+                        } else if (dimensionPath.equals("the_end")) {
+                            worldSaveName = "world_the_end";
+                        } else {
+                            worldSaveName = dimensionPath;
+                        }
+                    }
+                    
+                    locationData.put("world_save_name", worldSaveName);
+                    
+                    playerInfo.put("location", locationData);
+                    
                     return playerInfo;
                 })
                 .toList();
