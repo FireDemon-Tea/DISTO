@@ -2354,7 +2354,7 @@ class MetricsDashboard {
     }
 
     // BlueMap Integration Methods
-    initializeBlueMap() {
+    async initializeBlueMap() {
         console.log('Initializing BlueMap integration...');
         
         // Load BlueMap configuration
@@ -2363,11 +2363,77 @@ class MetricsDashboard {
         // Setup BlueMap event listeners
         this.setupBlueMapEventListeners();
         
+        // Try to auto-detect BlueMap first
+        await this.detectBlueMap();
+        
         // Initialize map if configuration exists
         if (this.bluemapConfig && this.bluemapConfig.url) {
             this.loadBlueMap();
         } else {
             this.showBlueMapConfiguration();
+        }
+    }
+
+    async detectBlueMap() {
+        console.log('Detecting BlueMap configuration...');
+        
+        try {
+            const response = await fetch('/api/bluemap/detect');
+            if (!response.ok) {
+                console.warn('Failed to detect BlueMap:', response.status);
+                this.hideMapTab();
+                return;
+            }
+            
+            const bluemapInfo = await response.json();
+            console.log('BlueMap detection result:', bluemapInfo);
+            
+            if (bluemapInfo.status === 'running' && bluemapInfo.detected_url) {
+                console.log('Auto-detected BlueMap URL:', bluemapInfo.detected_url);
+                
+                // Update configuration with detected URL
+                this.bluemapConfig.url = bluemapInfo.detected_url;
+                this.bluemapConfig.autoDetected = true;
+                this.bluemapConfig.detectionInfo = bluemapInfo;
+                
+                // Save the auto-detected configuration
+                this.saveBlueMapConfig();
+                
+                this.showNotification(`BlueMap auto-detected at ${bluemapInfo.detected_url}`, 'success');
+                this.showMapTab();
+            } else if (bluemapInfo.status === 'not_installed') {
+                console.log('BlueMap mod is not installed');
+                this.bluemapConfig.detectionInfo = bluemapInfo;
+                this.hideMapTab();
+            } else if (bluemapInfo.status === 'not_running') {
+                console.log('BlueMap mod is installed but not running');
+                this.bluemapConfig.detectionInfo = bluemapInfo;
+                this.showNotification('BlueMap mod is installed but not running. Please start BlueMap or configure manually.', 'warning');
+                this.hideMapTab();
+            } else {
+                // Any other status means BlueMap is not available
+                this.hideMapTab();
+            }
+            
+        } catch (error) {
+            console.error('Error detecting BlueMap:', error);
+            this.hideMapTab();
+        }
+    }
+
+    hideMapTab() {
+        const mapTab = document.querySelector('[data-tab="map"]');
+        if (mapTab) {
+            mapTab.style.display = 'none';
+            console.log('Map tab hidden - BlueMap not available');
+        }
+    }
+
+    showMapTab() {
+        const mapTab = document.querySelector('[data-tab="map"]');
+        if (mapTab) {
+            mapTab.style.display = 'block';
+            console.log('Map tab shown - BlueMap available');
         }
     }
 
@@ -2552,6 +2618,11 @@ class MetricsDashboard {
             testConnectionBtn.addEventListener('click', () => this.testBlueMapConnection());
         }
 
+        const detectBtn = document.getElementById('detect-bluemap');
+        if (detectBtn) {
+            detectBtn.addEventListener('click', () => this.manualDetectBlueMap());
+        }
+
         const cancelConfigBtn = document.getElementById('cancel-map-config');
         if (cancelConfigBtn) {
             cancelConfigBtn.addEventListener('click', () => this.hideBlueMapConfiguration());
@@ -2616,14 +2687,14 @@ class MetricsDashboard {
         // Handle iframe error
         iframe.onerror = () => {
             console.error('Failed to load BlueMap iframe');
-            this.showBlueMapError();
+            this.showBlueMapError('Failed to load BlueMap. Please check if BlueMap is running and accessible.');
         };
 
         // Timeout fallback
         setTimeout(() => {
             if (!iframe.classList.contains('loaded')) {
                 console.warn('BlueMap load timeout');
-                this.showBlueMapError();
+                this.showBlueMapError('BlueMap failed to load within 10 seconds. Please check the URL and try again.');
             }
         }, 10000); // 10 second timeout
     }
@@ -2641,7 +2712,7 @@ class MetricsDashboard {
         this.loadBlueMap();
     }
 
-    showBlueMapError() {
+    showBlueMapError(customMessage = null) {
         const loading = document.getElementById('map-loading');
         const error = document.getElementById('map-error');
         const iframe = document.getElementById('bluemap-iframe');
@@ -2651,7 +2722,17 @@ class MetricsDashboard {
             iframe.style.display = 'none';
             iframe.classList.remove('loaded');
         }
-        if (error) error.style.display = 'flex';
+        if (error) {
+            error.style.display = 'flex';
+            
+            // Update error message if custom message provided
+            if (customMessage) {
+                const errorMessage = error.querySelector('.error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = customMessage;
+                }
+            }
+        }
         
         this.updateMapStatus('disconnected');
     }
@@ -2667,7 +2748,59 @@ class MetricsDashboard {
             
             if (urlInput) urlInput.value = this.bluemapConfig.url;
             if (worldSelect) worldSelect.value = this.bluemapConfig.defaultWorld;
+            
+            // Show detection info if available
+            this.updateDetectionInfo();
         }
+    }
+    
+    updateDetectionInfo() {
+        const configPanel = document.querySelector('.map-config-panel');
+        if (!configPanel || !this.bluemapConfig.detectionInfo) return;
+        
+        const detectionInfo = this.bluemapConfig.detectionInfo;
+        
+        // Create or update detection info display
+        let detectionDiv = configPanel.querySelector('.detection-info');
+        if (!detectionDiv) {
+            detectionDiv = document.createElement('div');
+            detectionDiv.className = 'detection-info';
+            detectionDiv.style.cssText = 'margin-bottom: 1rem; padding: 0.75rem; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);';
+            
+            const formGroup = configPanel.querySelector('.form-group');
+            if (formGroup) {
+                configPanel.insertBefore(detectionDiv, formGroup);
+            }
+        }
+        
+        let statusColor = 'var(--text-secondary)';
+        let statusIcon = 'ℹ️';
+        
+        switch (detectionInfo.status) {
+            case 'running':
+                statusColor = 'var(--success-color)';
+                statusIcon = '✅';
+                break;
+            case 'not_running':
+                statusColor = 'var(--warning-color)';
+                statusIcon = '⚠️';
+                break;
+            case 'not_installed':
+                statusColor = 'var(--danger-color)';
+                statusIcon = '❌';
+                break;
+        }
+        
+        detectionDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <span style="color: ${statusColor};">${statusIcon}</span>
+                <strong style="color: ${statusColor};">BlueMap Detection</strong>
+            </div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                ${detectionInfo.message}
+                ${detectionInfo.detected_url ? `<br>Detected URL: <code>${detectionInfo.detected_url}</code>` : ''}
+            </div>
+        `;
     }
 
     hideBlueMapConfiguration() {
@@ -2713,7 +2846,50 @@ class MetricsDashboard {
         // Reload map with new configuration
         this.loadBlueMap();
         
+        // Show the map tab since we now have a configuration
+        this.showMapTab();
+        
         this.showNotification('BlueMap configuration saved successfully', 'success');
+    }
+
+    async manualDetectBlueMap() {
+        const detectBtn = document.getElementById('detect-bluemap');
+        const urlInput = document.getElementById('bluemap-url');
+        
+        if (!detectBtn) return;
+        
+        // Show loading state
+        const originalText = detectBtn.textContent;
+        detectBtn.textContent = 'Detecting...';
+        detectBtn.disabled = true;
+
+        try {
+            await this.detectBlueMap();
+            
+            // Update the URL input with detected URL if found
+            if (this.bluemapConfig.detected_url && urlInput) {
+                urlInput.value = this.bluemapConfig.detected_url;
+            }
+            
+            // Update detection info display
+            this.updateDetectionInfo();
+            
+            // Show/hide map tab based on detection result
+            if (this.bluemapConfig.detectionInfo && this.bluemapConfig.detectionInfo.status === 'running') {
+                this.showMapTab();
+            } else {
+                this.hideMapTab();
+            }
+            
+        } catch (error) {
+            console.error('Manual BlueMap detection failed:', error);
+            this.showNotification('BlueMap detection failed. Please check manually.', 'error');
+            this.hideMapTab();
+        } finally {
+            // Reset button
+            detectBtn.textContent = originalText;
+            detectBtn.disabled = false;
+        }
     }
 
     async testBlueMapConnection() {

@@ -22,6 +22,11 @@ public class PlayerAuthFilter implements Handler {
 
     @Override
     public void handle(Context ctx) throws Exception {
+        // Allow BlueMap detection endpoint without authentication
+        if (ctx.path().equals("/api/bluemap/detect")) {
+            return; // Skip authentication for BlueMap detection
+        }
+        
         // Check for session token first
         String sessionToken = ctx.header("X-Session-Token");
         if (sessionToken != null && activeSessions.containsKey(sessionToken)) {

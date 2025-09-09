@@ -44,6 +44,12 @@ public class WebServer {
         // Initialize user database
         userDatabase = new UserDatabase("config/users.json");
         
+        // BlueMap detection endpoint (no auth required for detection)
+        app.get("/api/bluemap/detect", ctx -> {
+            Map<String, Object> bluemapInfo = JsonUtil.detectBlueMapConfig();
+            ctx.json(bluemapInfo);
+        });
+        
         // Auth middleware
         playerAuth = new PlayerAuthFilter(token, serverSupplier, userDatabase);
         app.before("/api/*", playerAuth);

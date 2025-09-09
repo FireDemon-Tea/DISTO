@@ -16,6 +16,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.net.Socket;
+import java.net.InetSocketAddress;
 
 public class JsonUtil {
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -316,12 +318,165 @@ public class JsonUtil {
             commonMods.put("fabric", loader.isModLoaded("fabric"));
             commonMods.put("fabric_api", loader.isModLoaded("fabric-api"));
             commonMods.put("metricsbridge", loader.isModLoaded("metricsbridge"));
+            commonMods.put("bluemap", loader.isModLoaded("bluemap"));
             
             modInfo.put("common_mods", commonMods);
             
             root.put("mod_status", modInfo);
         } catch (Exception e) {
             root.put("mod_status", "Data unavailable");
+        }
+    }
+
+    /**
+     * Detect BlueMap configuration and running status
+     * @return Map containing BlueMap configuration information
+     */
+    public static Map<String, Object> detectBlueMapConfig() {
+        Map<String, Object> bluemapInfo = new HashMap<>();
+        
+        try {
+            // Check if BlueMap mod is loaded
+            FabricLoader loader = FabricLoader.getInstance();
+            boolean bluemapLoaded = loader.isModLoaded("bluemap");
+            bluemapInfo.put("mod_loaded", bluemapLoaded);
+            
+            if (!bluemapLoaded) {
+                bluemapInfo.put("status", "not_installed");
+                bluemapInfo.put("message", "BlueMap mod is not installed");
+                return bluemapInfo;
+            }
+            
+            // Try to detect BlueMap configuration files
+            Path bluemapConfigPath = Path.of("config/bluemap/bluemap.conf");
+            Path bluemapWebConfigPath = Path.of("config/bluemap/webserver.conf");
+            boolean configExists = Files.exists(bluemapConfigPath);
+            boolean webConfigExists = Files.exists(bluemapWebConfigPath);
+            bluemapInfo.put("config_exists", configExists);
+            bluemapInfo.put("web_config_exists", webConfigExists);
+            
+            // Try to read the web server configuration to get the actual port
+            String configuredPort = null;
+            if (webConfigExists) {
+                try {
+                    String configContent = Files.readString(bluemapWebConfigPath);
+                    
+                    // Look for port configuration in the config file
+                    String[] lines = configContent.split("\n");
+                    for (String line : lines) {
+                        line = line.trim();
+                        
+                        // Handle different config formats
+                        if (line.startsWith("port:") || line.startsWith("http-port:") || line.startsWith("port =") || line.startsWith("http-port =")) {
+                            String[] parts = line.split("[:=]");
+                            if (parts.length > 1) {
+                                configuredPort = parts[1].trim();
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore config reading errors
+                }
+            }
+            bluemapInfo.put("configured_port", configuredPort);
+            
+            String detectedPort = null;
+            String detectedUrl = null;
+            
+            // First, try the configured port if it exists
+            if (configuredPort != null) {
+                try {
+                    int port = Integer.parseInt(configuredPort);
+                    
+                    if (isPortOpen("localhost", port)) {
+                        if (isBlueMapRunning(port)) {
+                            detectedPort = String.valueOf(port);
+                            detectedUrl = "http://localhost:" + port;
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // Invalid port number, ignore
+                }
+            }
+            
+            // If configured port didn't work, try common BlueMap ports
+            if (detectedUrl == null) {
+                int[] commonPorts = {8100, 8101, 8102, 8080, 8081, 3000, 3001};
+                
+                for (int port : commonPorts) {
+                    if (isPortOpen("localhost", port)) {
+                        if (isBlueMapRunning(port)) {
+                            detectedPort = String.valueOf(port);
+                            detectedUrl = "http://localhost:" + port;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            bluemapInfo.put("detected_port", detectedPort);
+            bluemapInfo.put("detected_url", detectedUrl);
+            
+            if (detectedUrl != null) {
+                bluemapInfo.put("status", "running");
+                bluemapInfo.put("message", "BlueMap detected and running");
+            } else {
+                // Provide more specific error messages
+                if (configuredPort != null) {
+                    bluemapInfo.put("status", "not_running");
+                    bluemapInfo.put("message", "BlueMap mod is installed but not running on configured port " + configuredPort + ". Please start BlueMap or check the configuration.");
+                } else if (configExists || webConfigExists) {
+                    bluemapInfo.put("status", "not_running");
+                    bluemapInfo.put("message", "BlueMap mod is installed and configured but not running. Please start BlueMap.");
+                } else {
+                    bluemapInfo.put("status", "not_running");
+                    bluemapInfo.put("message", "BlueMap mod is installed but not configured or running. Please configure and start BlueMap.");
+                }
+            }
+            
+        } catch (Exception e) {
+            bluemapInfo.put("status", "error");
+            bluemapInfo.put("message", "Error detecting BlueMap: " + e.getMessage());
+        }
+        
+        return bluemapInfo;
+    }
+    
+    /**
+     * Check if a port is open
+     */
+    private static boolean isPortOpen(String host, int port) {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), 1000); // 1 second timeout
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Check if BlueMap is actually running on the port by testing for BlueMap-specific endpoints
+     */
+    private static boolean isBlueMapRunning(int port) {
+        try {
+            // Try to make an HTTP request to check for BlueMap-specific endpoints
+            java.net.URI uri = java.net.URI.create("http://localhost:" + port + "/settings.json");
+            java.net.URL url = uri.toURL();
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(2000); // 2 second timeout
+            connection.setReadTimeout(2000);
+            
+            int responseCode = connection.getResponseCode();
+            connection.disconnect();
+            
+            // BlueMap should return 200 for settings.json if it's running properly
+            return responseCode == 200;
+            
+        } catch (Exception e) {
+            // If we can't connect or get an error, it's probably not BlueMap
+            return false;
         }
     }
 }
