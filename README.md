@@ -53,16 +53,73 @@ A comprehensive Minecraft Fabric mod that provides a web-based dashboard for mon
 
 **Note**: The JAR file is automatically built and released on GitHub when new versions are tagged.
 
-### Option 2: Service Installation (Linux)
+### Option 2: Service Installation
 
-For production servers, you can install the Minecraft server as a systemd service that automatically starts with the MetricsBridge mod.
+#### Windows Service Installation
 
-#### Prerequisites
+For Windows servers, you can install the Minecraft server as a Windows service that automatically detects the MetricsBridge mod and behaves accordingly:
+- **With MetricsBridge mod**: Runs as a background service
+- **Without MetricsBridge mod**: Runs in terminal mode
+
+##### Prerequisites
+- Windows 7/8/10/11 or Windows Server
+- Java 21+ installed
+- Administrator privileges
+
+##### Quick Installation
+1. Download the service files to your Minecraft server directory
+2. Right-click `install-windows-service.bat` and select "Run as administrator"
+3. Follow the on-screen prompts
+
+##### Manual Installation Steps
+1. **Download service files** to your Minecraft server directory:
+   - `MinecraftServiceWrapper.java`
+   - `install-windows-service.bat`
+   - `uninstall-windows-service.bat`
+
+2. **Run the installer** as Administrator:
+   ```cmd
+   install-windows-service.bat
+   ```
+
+3. **The installer will**:
+   - Check for Java installation
+   - Detect if MetricsBridge mod is installed
+   - Compile the service wrapper
+   - Install the Windows service
+   - Configure auto-start and recovery options
+
+##### Service Behavior
+- **MetricsBridge mod detected**: Server runs as background service
+- **No MetricsBridge mod**: Server runs in terminal mode (visible console)
+- **Auto-restart**: Service automatically restarts if it crashes
+- **Auto-start**: Service starts automatically when Windows boots
+
+##### Service Management
+Use Windows Services management console (`services.msc`) or command line:
+```cmd
+sc start MinecraftServer      # Start the service
+sc stop MinecraftServer       # Stop the service
+sc query MinecraftServer      # Check service status
+sc delete MinecraftServer     # Remove the service
+```
+
+##### Uninstallation
+```cmd
+# Run as Administrator
+uninstall-windows-service.bat
+```
+
+#### Linux Service Installation
+
+For production Linux servers, you can install the Minecraft server as a systemd service that automatically starts with the MetricsBridge mod.
+
+##### Prerequisites
 - Linux system with systemd
 - Java 21+ installed
 - Root/sudo access
 
-#### Quick Installation
+##### Quick Installation
 ```bash
 # Download the installation script
 wget https://raw.githubusercontent.com/yourusername/fabric-metrics-bridge/main/install-service.sh
@@ -72,7 +129,7 @@ chmod +x install-service.sh
 sudo ./install-service.sh
 ```
 
-#### Manual Installation Steps
+##### Manual Installation Steps
 1. **Create minecraft user and directories**:
    ```bash
    sudo groupadd -r minecraft
@@ -99,7 +156,7 @@ sudo ./install-service.sh
    sudo systemctl start minecraft-server
    ```
 
-#### Service Management
+##### Service Management
 The installation script creates a convenient management command:
 ```bash
 minecraft-server start     # Start the server
@@ -111,7 +168,7 @@ minecraft-server enable    # Enable auto-start on boot
 minecraft-server disable   # Disable auto-start on boot
 ```
 
-#### Uninstallation
+##### Uninstallation
 ```bash
 # Download and run the uninstall script
 wget https://raw.githubusercontent.com/yourusername/fabric-metrics-bridge/main/uninstall-service.sh
@@ -119,7 +176,7 @@ chmod +x uninstall-service.sh
 sudo ./uninstall-service.sh
 ```
 
-#### Service Configuration
+##### Service Configuration
 The service is configured with:
 - **User**: `minecraft` (dedicated system user)
 - **Directory**: `/opt/minecraft`
