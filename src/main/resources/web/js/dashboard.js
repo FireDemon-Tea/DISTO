@@ -239,6 +239,9 @@ class MetricsDashboard {
         
         // Initialize admin portal if user is admin
         this.initializeAdminPortal();
+        
+        // Initialize BlueMap integration
+        this.initializeBlueMap();
     }
 
     loadDashboardHTML() {
@@ -2292,6 +2295,345 @@ class MetricsDashboard {
             notification.classList.remove('show');
             setTimeout(() => document.body.removeChild(notification), 300);
         }, 5000);
+    }
+
+    // BlueMap Integration Methods
+    initializeBlueMap() {
+        console.log('Initializing BlueMap integration...');
+        
+        // Load BlueMap configuration
+        this.loadBlueMapConfig();
+        
+        // Setup BlueMap event listeners
+        this.setupBlueMapEventListeners();
+        
+        // Initialize map if configuration exists
+        if (this.bluemapConfig && this.bluemapConfig.url) {
+            this.loadBlueMap();
+        } else {
+            this.showBlueMapConfiguration();
+        }
+    }
+
+    loadBlueMapConfig() {
+        // Load BlueMap configuration from localStorage
+        const config = localStorage.getItem('bluemap_config');
+        if (config) {
+            try {
+                this.bluemapConfig = JSON.parse(config);
+            } catch (e) {
+                console.error('Failed to parse BlueMap config:', e);
+                this.bluemapConfig = this.getDefaultBlueMapConfig();
+            }
+        } else {
+            this.bluemapConfig = this.getDefaultBlueMapConfig();
+        }
+    }
+
+    getDefaultBlueMapConfig() {
+        return {
+            url: 'http://localhost:8100',
+            defaultWorld: '',
+            autoRefresh: true,
+            fullscreenEnabled: true
+        };
+    }
+
+    saveBlueMapConfig() {
+        localStorage.setItem('bluemap_config', JSON.stringify(this.bluemapConfig));
+    }
+
+    setupBlueMapEventListeners() {
+        // Refresh map button
+        const refreshBtn = document.getElementById('refresh-map');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshBlueMap());
+        }
+
+        // Fullscreen map button
+        const fullscreenBtn = document.getElementById('fullscreen-map');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => this.toggleFullscreenMap());
+        }
+
+        // Retry map button
+        const retryBtn = document.getElementById('retry-map');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.retryBlueMap());
+        }
+
+        // Configure map button
+        const configureBtn = document.getElementById('configure-map');
+        if (configureBtn) {
+            configureBtn.addEventListener('click', () => this.showBlueMapConfiguration());
+        }
+
+        // Configuration form buttons
+        const saveConfigBtn = document.getElementById('save-map-config');
+        if (saveConfigBtn) {
+            saveConfigBtn.addEventListener('click', () => this.saveBlueMapConfiguration());
+        }
+
+        const testConnectionBtn = document.getElementById('test-map-connection');
+        if (testConnectionBtn) {
+            testConnectionBtn.addEventListener('click', () => this.testBlueMapConnection());
+        }
+
+        const cancelConfigBtn = document.getElementById('cancel-map-config');
+        if (cancelConfigBtn) {
+            cancelConfigBtn.addEventListener('click', () => this.hideBlueMapConfiguration());
+        }
+
+        // Escape key to exit fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isMapFullscreen) {
+                this.exitFullscreenMap();
+            }
+        });
+    }
+
+    loadBlueMap() {
+        console.log('Loading BlueMap...', this.bluemapConfig);
+        
+        const iframe = document.getElementById('bluemap-iframe');
+        const loading = document.getElementById('map-loading');
+        const error = document.getElementById('map-error');
+        
+        if (!iframe || !loading || !error) {
+            console.error('BlueMap elements not found');
+            return;
+        }
+
+        // Show loading state
+        loading.style.display = 'flex';
+        error.style.display = 'none';
+        iframe.style.display = 'none';
+        iframe.classList.remove('loaded');
+
+        // Build BlueMap URL
+        let mapUrl = this.bluemapConfig.url;
+        if (this.bluemapConfig.defaultWorld) {
+            mapUrl += `#${this.bluemapConfig.defaultWorld}`;
+        }
+
+        // Set iframe source
+        iframe.src = mapUrl;
+
+        // Handle iframe load
+        iframe.onload = () => {
+            console.log('BlueMap iframe loaded successfully');
+            setTimeout(() => {
+                loading.style.display = 'none';
+                iframe.style.display = 'block';
+                iframe.classList.add('loaded');
+                this.updateMapStatus('connected');
+            }, 1000); // Small delay to ensure smooth transition
+        };
+
+        // Handle iframe error
+        iframe.onerror = () => {
+            console.error('Failed to load BlueMap iframe');
+            this.showBlueMapError();
+        };
+
+        // Timeout fallback
+        setTimeout(() => {
+            if (!iframe.classList.contains('loaded')) {
+                console.warn('BlueMap load timeout');
+                this.showBlueMapError();
+            }
+        }, 10000); // 10 second timeout
+    }
+
+    refreshBlueMap() {
+        console.log('Refreshing BlueMap...');
+        this.loadBlueMap();
+    }
+
+    retryBlueMap() {
+        console.log('Retrying BlueMap connection...');
+        this.loadBlueMap();
+    }
+
+    showBlueMapError() {
+        const loading = document.getElementById('map-loading');
+        const error = document.getElementById('map-error');
+        const iframe = document.getElementById('bluemap-iframe');
+        
+        if (loading) loading.style.display = 'none';
+        if (iframe) {
+            iframe.style.display = 'none';
+            iframe.classList.remove('loaded');
+        }
+        if (error) error.style.display = 'flex';
+        
+        this.updateMapStatus('disconnected');
+    }
+
+    showBlueMapConfiguration() {
+        const configPanel = document.querySelector('.map-config-panel');
+        if (configPanel) {
+            configPanel.style.display = 'block';
+            
+            // Populate form with current config
+            const urlInput = document.getElementById('bluemap-url');
+            const worldSelect = document.getElementById('map-world');
+            
+            if (urlInput) urlInput.value = this.bluemapConfig.url;
+            if (worldSelect) worldSelect.value = this.bluemapConfig.defaultWorld;
+        }
+    }
+
+    hideBlueMapConfiguration() {
+        const configPanel = document.querySelector('.map-config-panel');
+        if (configPanel) {
+            configPanel.style.display = 'none';
+        }
+    }
+
+    saveBlueMapConfiguration() {
+        const urlInput = document.getElementById('bluemap-url');
+        const worldSelect = document.getElementById('map-world');
+        
+        if (!urlInput) {
+            this.showNotification('URL input not found', 'error');
+            return;
+        }
+
+        const url = urlInput.value.trim();
+        if (!url) {
+            this.showNotification('Please enter a BlueMap URL', 'error');
+            return;
+        }
+
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (e) {
+            this.showNotification('Please enter a valid URL', 'error');
+            return;
+        }
+
+        // Update configuration
+        this.bluemapConfig.url = url;
+        this.bluemapConfig.defaultWorld = worldSelect ? worldSelect.value : '';
+        
+        // Save configuration
+        this.saveBlueMapConfig();
+        
+        // Hide configuration panel
+        this.hideBlueMapConfiguration();
+        
+        // Reload map with new configuration
+        this.loadBlueMap();
+        
+        this.showNotification('BlueMap configuration saved successfully', 'success');
+    }
+
+    async testBlueMapConnection() {
+        const urlInput = document.getElementById('bluemap-url');
+        const testBtn = document.getElementById('test-map-connection');
+        
+        if (!urlInput || !testBtn) return;
+        
+        const url = urlInput.value.trim();
+        if (!url) {
+            this.showNotification('Please enter a BlueMap URL first', 'error');
+            return;
+        }
+
+        // Show loading state
+        const originalText = testBtn.textContent;
+        testBtn.textContent = 'Testing...';
+        testBtn.disabled = true;
+
+        try {
+            // Test connection by trying to fetch the BlueMap page
+            const response = await fetch(url, { 
+                method: 'HEAD',
+                mode: 'no-cors' // Handle CORS issues
+            });
+            
+            // If we get here without an error, the connection is likely working
+            this.showNotification('BlueMap connection test successful!', 'success');
+            
+        } catch (error) {
+            console.error('BlueMap connection test failed:', error);
+            this.showNotification('BlueMap connection test failed. Please check the URL and ensure BlueMap is running.', 'error');
+        } finally {
+            // Reset button
+            testBtn.textContent = originalText;
+            testBtn.disabled = false;
+        }
+    }
+
+    toggleFullscreenMap() {
+        if (this.isMapFullscreen) {
+            this.exitFullscreenMap();
+        } else {
+            this.enterFullscreenMap();
+        }
+    }
+
+    enterFullscreenMap() {
+        const mapContainer = document.querySelector('.map-container');
+        if (!mapContainer) return;
+
+        // Add fullscreen class
+        mapContainer.classList.add('map-fullscreen');
+        this.isMapFullscreen = true;
+
+        // Update button text
+        const fullscreenBtn = document.getElementById('fullscreen-map');
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = '<span class="btn-icon">⛶</span> Exit Fullscreen';
+        }
+
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+
+        console.log('Entered fullscreen map mode');
+    }
+
+    exitFullscreenMap() {
+        const mapContainer = document.querySelector('.map-container');
+        if (!mapContainer) return;
+
+        // Remove fullscreen class
+        mapContainer.classList.remove('map-fullscreen');
+        this.isMapFullscreen = false;
+
+        // Update button text
+        const fullscreenBtn = document.getElementById('fullscreen-map');
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = '<span class="btn-icon">⛶</span> Fullscreen';
+        }
+
+        // Restore body scroll
+        document.body.style.overflow = '';
+
+        console.log('Exited fullscreen map mode');
+    }
+
+    updateMapStatus(status) {
+        // This could be used to show connection status in the UI
+        console.log('BlueMap status:', status);
+        
+        // You could add a status indicator to the map header here
+        const mapHeader = document.querySelector('#map .card-header');
+        if (mapHeader) {
+            // Remove existing status
+            const existingStatus = mapHeader.querySelector('.map-status');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+            
+            // Add new status
+            const statusElement = document.createElement('div');
+            statusElement.className = `map-status ${status}`;
+            statusElement.textContent = status;
+            mapHeader.appendChild(statusElement);
+        }
     }
 }
 
