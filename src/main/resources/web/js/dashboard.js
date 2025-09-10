@@ -69,6 +69,7 @@ class MetricsDashboard {
                 if (data.authenticated) {
                     this.isAuthenticated = true;
                     this.userInfo = data;
+                    this.updateProfileButton();
                     this.initializeDashboard();
                     return;
                 } else {
@@ -181,6 +182,7 @@ class MetricsDashboard {
                 this.sessionToken = data.sessionToken;
                 this.isAuthenticated = true;
                 this.userInfo = data;
+                this.updateProfileButton();
                 
                 // Store session token
                 localStorage.setItem('session_token', this.sessionToken);
@@ -302,6 +304,60 @@ class MetricsDashboard {
             
             // Show login form again
             this.showLoginForm();
+        }
+    }
+
+    updateProfileButton() {
+        if (!this.userInfo) return;
+        
+        // Update profile initials
+        const initials = this.userInfo.username ? this.userInfo.username.charAt(0).toUpperCase() : 'U';
+        const profileInitials = document.querySelector('.profile-initials');
+        if (profileInitials) {
+            profileInitials.textContent = initials;
+        }
+        
+        // Update profile name
+        const profileName = document.querySelector('.profile-name');
+        if (profileName) {
+            profileName.textContent = this.userInfo.username || 'User';
+        }
+        
+        // Update admin badge
+        const profileBadge = document.querySelector('.profile-badge');
+        if (profileBadge) {
+            if (this.userInfo.isAdmin) {
+                profileBadge.textContent = 'ADMIN';
+                profileBadge.style.display = 'inline-block';
+            } else {
+                profileBadge.style.display = 'none';
+            }
+        }
+        
+        // Update popup profile info
+        const popupInitials = document.querySelector('.profile-popup-initials');
+        if (popupInitials) {
+            popupInitials.textContent = initials;
+        }
+        
+        const popupName = document.querySelector('.profile-popup-name');
+        if (popupName) {
+            popupName.textContent = this.userInfo.username || 'User';
+        }
+        
+        const popupRole = document.querySelector('.profile-popup-role');
+        if (popupRole) {
+            popupRole.textContent = this.userInfo.isAdmin ? 'Administrator' : 'User';
+        }
+        
+        // Show/hide dashboard settings based on admin status
+        const dashboardSettingsMenu = document.getElementById('dashboard-settings-menu');
+        if (dashboardSettingsMenu) {
+            if (this.userInfo.isAdmin) {
+                dashboardSettingsMenu.style.display = 'flex';
+            } else {
+                dashboardSettingsMenu.style.display = 'none';
+            }
         }
     }
 
@@ -869,7 +925,7 @@ class MetricsDashboard {
             this.updateDashboardTitle(dashboardTitle);
         }
         
-        this.showSuccessMessage('Settings saved successfully!');
+            this.showSuccessMessage('Settings saved successfully!');
     }
 
     resetSettings() {
@@ -881,7 +937,7 @@ class MetricsDashboard {
             this.updateDashboardTitle('DISTO Dashboard');
         }
         
-        this.showSuccessMessage('Settings reset to default!');
+            this.showSuccessMessage('Settings reset to default!');
     }
 
     updateDashboardTitle(title) {

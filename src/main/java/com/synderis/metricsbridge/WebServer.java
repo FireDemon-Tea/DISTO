@@ -7,6 +7,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
@@ -97,6 +98,7 @@ public class WebServer {
                 Double z = ((Number) request.get("z")).doubleValue();
                 String world = (String) request.get("world");
                 
+                
                 if (playerName == null || playerName.trim().isEmpty()) {
                     Map<String, Object> response = new HashMap<>();
                     response.put("success", false);
@@ -122,8 +124,18 @@ public class WebServer {
                     return;
                 }
 
-                // Find the player
+                // Find the player - try multiple methods
                 var player = server.getPlayerManager().getPlayer(playerName);
+                if (player == null) {
+                    // Try finding by exact username match
+                    for (var onlinePlayer : server.getPlayerManager().getPlayerList()) {
+                        if (onlinePlayer.getGameProfile().getName().equalsIgnoreCase(playerName)) {
+                            player = onlinePlayer;
+                            break;
+                        }
+                    }
+                }
+                
                 if (player == null) {
                     Map<String, Object> response = new HashMap<>();
                     response.put("success", false);
@@ -131,6 +143,9 @@ public class WebServer {
                     ctx.json(response);
                     return;
                 }
+                
+                // Use the actual username from the player's GameProfile
+                String actualPlayerName = player.getGameProfile().getName();
 
                 // Find the target world by checking all available worlds
                 net.minecraft.server.world.ServerWorld targetWorld = null;
@@ -149,8 +164,9 @@ public class WebServer {
                     return;
                 }
 
-                // Execute teleport command
-                String teleportCommand = String.format("tp %s %f %f %f", playerName, x, y, z);
+                // Execute teleport command using the actual username (force periods as decimal separators)
+                String teleportCommand = String.format(Locale.US, "tp %s %.1f %.1f %.1f", actualPlayerName, x, y, z);
+                
                 ServerCommandSource source = server.getCommandSource();
                 int result = server.getCommandManager().getDispatcher().execute(teleportCommand, source.withSilent());
                 

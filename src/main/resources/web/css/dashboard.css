@@ -69,15 +69,14 @@ body {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center; /* Center the content */
   position: relative;
   overflow: visible; /* Allow popups to extend beyond content */
+  height: 100%; /* Take full header height */
 }
 
 .header-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Centered with flexbox in header-content */
 }
 
 .logo-image {
@@ -114,7 +113,9 @@ body {
 
 /* Profile Popup */
 .profile-container {
-  position: relative;
+  position: fixed;
+  top: 20px; /* Top left corner */
+  left: 20px;
   z-index: 200; /* Higher than header z-index */
 }
 
@@ -1761,7 +1762,7 @@ body {
 
 .map-content {
   position: relative;
-  height: 600px;
+  height: calc(100vh - 250px); /* Further reduced height to show bottom of widget */
   background: var(--background);
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -2312,6 +2313,12 @@ body {
     left: 10px;
     right: 10px;
     max-width: none;
+  }
+  
+  /* Adjust profile position on mobile */
+  .profile-container {
+    top: 10px;
+    left: 10px;
   }
   
   /* Add hamburger menu button */

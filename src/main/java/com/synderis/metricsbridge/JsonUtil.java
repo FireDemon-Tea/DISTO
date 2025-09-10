@@ -50,7 +50,9 @@ public class JsonUtil {
             List<Map<String, Object>> playerDetails = players.stream()
                 .map(player -> {
                     Map<String, Object> playerInfo = new HashMap<>();
-                    playerInfo.put("name", player.getName().getString());
+                    // Use the actual username from GameProfile, not display name
+                    String actualUsername = player.getGameProfile().getName();
+                    playerInfo.put("name", actualUsername);
                     playerInfo.put("ping", player.networkHandler.getLatency());
                     
                     // Add player location data
