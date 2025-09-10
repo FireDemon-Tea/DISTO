@@ -61,13 +61,13 @@ The mod will create a `config/disto.json` file on first run:
 
 ```json
 {
+    "configVersion": 3,
     "httpPort": 8765,
-    "sharedSecret": "change-me",
     "allowOrigins": ["*"]
 }
 ```
 
-**Important**: Change the `sharedSecret` to a secure value before using in production!
+**Important**: Change the default admin password immediately after first login!
 
 ### 3. Access the Dashboard
 
@@ -83,9 +83,56 @@ The mod will create a `config/disto.json` file on first run:
 
 | Option | Description | Default | Required |
 |--------|-------------|---------|----------|
-| `httpPort` | Port for the web dashboard | `8765` | No |
-| `sharedSecret` | Secret token for API access | `change-me` | Yes |
+| `configVersion` | Configuration file version (auto-managed) | `3` | No |
+| `httpPort` | Port for the HTTP web dashboard | `8765` | No |
+| `httpsPort` | Port for the HTTPS web dashboard | `8766` | No |
+| `enableHttps` | Enable HTTPS server | `false` | No |
+| `sslKeyPath` | Path to SSL private key file | `config/ssl/private.key` | No |
+| `sslCertPath` | Path to SSL certificate file | `config/ssl/certificate.crt` | No |
 | `allowOrigins` | CORS allowed origins | `["*"]` | No |
+
+### Configuration Migration
+
+The mod automatically migrates old configuration files to newer versions. When you start the server:
+
+- **New installations**: Creates `config/disto.json` with the latest configuration format
+- **Existing installations**: Automatically adds missing configuration options while preserving your existing settings
+- **Version tracking**: The `configVersion` field tracks the configuration format version
+
+**Migration from version 1 to 2**: Automatically adds HTTPS support options (`httpsPort`, `enableHttps`, `sslKeyPath`, `sslCertPath`) to existing configurations.
+
+**Migration from version 2 to 3**: Removes `sharedSecret` (replaced by user-based authentication system).
+
+### HTTPS Configuration
+
+**Note**: HTTPS support is currently in development. The configuration options are available but the HTTPS server implementation is a placeholder.
+
+To prepare for HTTPS support:
+
+1. **Generate SSL Certificate** (for development/testing):
+   ```bash
+   mkdir -p config/ssl
+   openssl req -x509 -newkey rsa:4096 -keyout config/ssl/private.key -out config/ssl/certificate.crt -days 365 -nodes
+   ```
+
+2. **Update Configuration**:
+   ```json
+   {
+       "configVersion": 3,
+       "httpPort": 8765,
+       "httpsPort": 8766,
+       "enableHttps": true,
+       "sslKeyPath": "config/ssl/private.key",
+       "sslCertPath": "config/ssl/certificate.crt",
+       "allowOrigins": ["*"]
+   }
+   ```
+
+3. **Current Status**:
+   - HTTP: `http://localhost:8765` (fully functional)
+   - HTTPS: Configuration ready, server implementation pending
+
+**Note**: BlueMap integration will continue to use HTTP regardless of the dashboard protocol. The dashboard JavaScript automatically detects the current protocol (HTTP/HTTPS) and uses it for API calls.
 
 ## 👥 User Management
 

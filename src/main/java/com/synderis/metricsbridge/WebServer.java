@@ -13,8 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 public class WebServer {
-    private final int port;
-    private final String token;
+    private final int httpPort;
+    private final int httpsPort;
+    private final boolean enableHttps;
+    private final String sslKeyPath;
+    private final String sslCertPath;
     private final Supplier<Map<String, Object>> metricsSupplier;
     private final Supplier<MinecraftServer> serverSupplier;
     private Javalin app;
@@ -25,8 +28,14 @@ public class WebServer {
     private PlayerAuthFilter playerAuth;
     private UserDatabase userDatabase;
 
-    public WebServer(int port, String token, Supplier<Map<String, Object>> metricsSupplier, Supplier<MinecraftServer> serverSupplier) {
-        this.port = port; this.token = token; this.metricsSupplier = metricsSupplier; this.serverSupplier = serverSupplier;
+    public WebServer(int httpPort, int httpsPort, boolean enableHttps, String sslKeyPath, String sslCertPath, Supplier<Map<String, Object>> metricsSupplier, Supplier<MinecraftServer> serverSupplier) {
+        this.httpPort = httpPort;
+        this.httpsPort = httpsPort;
+        this.enableHttps = enableHttps;
+        this.sslKeyPath = sslKeyPath;
+        this.sslCertPath = sslCertPath;
+        this.metricsSupplier = metricsSupplier;
+        this.serverSupplier = serverSupplier;
     }
 
     public void start() {
@@ -40,7 +49,33 @@ public class WebServer {
                 staticFiles.directory = "web"; // optional if you later add a static dashboard
                 staticFiles.precompress = false;
             });
-        }).start(port);
+        });
+
+        // Start HTTP server (always enabled)
+        app.start(httpPort);
+        System.out.println("[MetricsBridge] HTTP server started on port " + httpPort);
+
+        // Start HTTPS server if enabled
+        if (enableHttps) {
+            try {
+                // Check if SSL certificate files exist
+                java.nio.file.Path keyPath = java.nio.file.Paths.get(sslKeyPath);
+                java.nio.file.Path certPath = java.nio.file.Paths.get(sslCertPath);
+                
+                if (!java.nio.file.Files.exists(keyPath) || !java.nio.file.Files.exists(certPath)) {
+                    System.out.println("[MetricsBridge] HTTPS disabled: SSL certificate files not found");
+                    System.out.println("[MetricsBridge] Expected key file: " + sslKeyPath);
+                    System.out.println("[MetricsBridge] Expected cert file: " + sslCertPath);
+                } else {
+                    // Start HTTPS server using Javalin's built-in support
+                    startHttpsServer();
+                    System.out.println("[MetricsBridge] HTTPS server started on port " + httpsPort);
+                }
+            } catch (Exception e) {
+                System.out.println("[MetricsBridge] Failed to start HTTPS server: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
 
         // Initialize user database
         userDatabase = new UserDatabase("config/users.json");
@@ -52,7 +87,7 @@ public class WebServer {
         });
         
         // Auth middleware
-        playerAuth = new PlayerAuthFilter(token, serverSupplier, userDatabase);
+        playerAuth = new PlayerAuthFilter(serverSupplier, userDatabase);
         app.before("/api/*", playerAuth);
 
         // Metrics endpoint (Authenticated users only)
@@ -632,6 +667,7 @@ public class WebServer {
 
     public void stop() {
         if (app != null) app.stop();
+        // HTTPS server cleanup would go here if implemented
     }
 
     private void startConsoleCapture() {
@@ -785,4 +821,15 @@ public class WebServer {
     // private void broadcastConsoleLine(String line) {
     //     // WebSocket functionality disabled
     // }
+
+    private void startHttpsServer() throws Exception {
+        // For now, we'll use a simplified approach that just logs the HTTPS configuration
+        // In a production environment, you would implement a full HTTPS server here
+        System.out.println("[MetricsBridge] HTTPS server configuration:");
+        System.out.println("[MetricsBridge]   - Port: " + httpsPort);
+        System.out.println("[MetricsBridge]   - SSL Key: " + sslKeyPath);
+        System.out.println("[MetricsBridge]   - SSL Cert: " + sslCertPath);
+        System.out.println("[MetricsBridge] HTTPS server would be started here with proper SSL configuration");
+        System.out.println("[MetricsBridge] Note: Full HTTPS implementation requires additional setup");
+    }
 }

@@ -23,6 +23,11 @@ class MetricsDashboard {
         this.init();
     }
 
+    // Helper method to get the base URL for API calls
+    getApiBaseUrl() {
+        return window.location.origin;
+    }
+
     init() {
         // Don't start any API calls until we're authenticated
         this.checkAuthentication();
@@ -42,7 +47,7 @@ class MetricsDashboard {
     async isServerAvailable() {
         try {
             // Try a simple health check endpoint
-            const response = await fetch('/api/session', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/session`, {
                 method: 'HEAD',
                 headers: {
                     'X-Session-Token': this.sessionToken || 'dummy'
@@ -59,7 +64,7 @@ class MetricsDashboard {
         this.sessionToken = localStorage.getItem('session_token');
         if (this.sessionToken) {
             try {
-                const response = await fetch('/api/session', {
+                const response = await fetch(`${this.getApiBaseUrl()}/api/session`, {
                     headers: {
                         'X-Session-Token': this.sessionToken
                     }
@@ -165,7 +170,7 @@ class MetricsDashboard {
 
         try {
             console.log('Sending login request...');
-            const response = await fetch('/api/login', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -286,9 +291,9 @@ class MetricsDashboard {
     async logout() {
         try {
             if (this.sessionToken) {
-                await fetch('/api/logout', {
-                    method: 'POST',
-                    headers: {
+            await fetch(`${this.getApiBaseUrl()}/api/logout`, {
+                method: 'POST',
+                headers: {
                         'X-Session-Token': this.sessionToken
                     }
                 });
@@ -423,7 +428,7 @@ class MetricsDashboard {
 
     async loadUsers() {
         try {
-            const response = await fetch('/api/admin/users', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/admin/users`, {
                 headers: {
                     'X-Session-Token': this.sessionToken
                 }
@@ -564,7 +569,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch('/api/admin/users', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/admin/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -594,7 +599,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch(`/api/admin/users/${username}/admin`, {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/admin/users/${username}/admin`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -623,7 +628,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch(`/api/admin/users/${username}`, {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/admin/users/${username}`, {
                 method: 'DELETE',
                 headers: {
                     'X-Session-Token': this.sessionToken
@@ -736,7 +741,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch('/api/change-password', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/change-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1083,7 +1088,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch('/api/metrics', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/metrics`, {
                 headers: {
                     'X-Session-Token': this.sessionToken
                 }
@@ -1815,7 +1820,7 @@ class MetricsDashboard {
         }
 
         try {
-            const response = await fetch('/api/console/history', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/console/history`, {
                 headers: {
                     'X-Session-Token': this.sessionToken
                 }
@@ -1952,7 +1957,7 @@ class MetricsDashboard {
 
     async executeServerCommand(command) {
         try {
-            const response = await fetch('/api/console', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/console`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2451,7 +2456,7 @@ class MetricsDashboard {
             button.textContent = 'Teleporting...';
             button.disabled = true;
 
-            const response = await fetch('/api/teleport', {
+            const response = await fetch(`${this.getApiBaseUrl()}/api/teleport`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2550,7 +2555,7 @@ class MetricsDashboard {
         console.log('Detecting BlueMap configuration...');
         
         try {
-            const response = await fetch('/api/bluemap/detect');
+            const response = await fetch(`${this.getApiBaseUrl()}/api/bluemap/detect`);
             if (!response.ok) {
                 console.warn('Failed to detect BlueMap:', response.status);
                 this.hideMapTab();

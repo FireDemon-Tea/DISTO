@@ -8,14 +8,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public class PlayerAuthFilter implements Handler {
-    private final String fallbackToken;
     private final Supplier<MinecraftServer> serverSupplier;
     private final UserDatabase userDatabase;
     private final Map<String, SessionInfo> activeSessions = new ConcurrentHashMap<>();
     private final long sessionTimeoutMs = 24 * 60 * 60 * 1000; // 24 hours
 
-    public PlayerAuthFilter(String fallbackToken, Supplier<MinecraftServer> serverSupplier, UserDatabase userDatabase) {
-        this.fallbackToken = fallbackToken;
+    public PlayerAuthFilter(Supplier<MinecraftServer> serverSupplier, UserDatabase userDatabase) {
         this.serverSupplier = serverSupplier;
         this.userDatabase = userDatabase;
     }
@@ -40,16 +38,7 @@ public class PlayerAuthFilter implements Handler {
             }
         }
 
-        // Check fallback token for backward compatibility
-        String auth = ctx.header("Authorization");
-        if (auth != null && auth.equals("Bearer " + fallbackToken)) {
-            return; // Authorized via fallback token
-        }
-        
-        String queryToken = ctx.queryParam("token");
-        if (queryToken != null && queryToken.equals(fallbackToken)) {
-            return; // Authorized via query parameter
-        }
+        // No fallback token authentication - user-based authentication only
         
         // Not authorized
         ctx.status(401).json("Unauthorized");

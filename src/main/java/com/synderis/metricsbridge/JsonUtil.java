@@ -167,6 +167,14 @@ public class JsonUtil {
         catch (Exception e) { return "{}"; }
     }
 
+    public static Map<String, Object> parseJson(String json) {
+        try { 
+            return MAPPER.readValue(json, new TypeReference<>(){}); 
+        } catch (Exception e) { 
+            throw new RuntimeException("Failed to parse JSON: " + e.getMessage(), e); 
+        }
+    }
+
     private static double round(double v) {
         return Math.round(v * 100.0) / 100.0;
     }

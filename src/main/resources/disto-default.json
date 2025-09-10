@@ -1,5 +1,9 @@
 {
+    "configVersion": 3,
     "httpPort": 8765,
-    "sharedSecret": "change-me",
+    "httpsPort": 8766,
+    "enableHttps": false,
+    "sslKeyPath": "config/ssl/private.key",
+    "sslCertPath": "config/ssl/certificate.crt",
     "allowOrigins": ["*"]
 }
